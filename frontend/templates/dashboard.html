@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fadein">
+    <h2><i class="fa-solid fa-gauge"></i> Dashboard</h2>
+    <p>Overview of the Cricket Auction & League</p>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-blue animate-fadein">
+            <i class="fa-solid fa-people-group"></i>
+            <h3>{{ total_teams }}</h3>
+            <p>Total Teams</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-green animate-fadein">
+            <i class="fa-solid fa-users"></i>
+            <h3>{{ total_players }}</h3>
+            <p>Total Players</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-orange animate-fadein">
+            <i class="fa-solid fa-user-clock"></i>
+            <h3>{{ remaining_players }}</h3>
+            <p>Remaining Players</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-purple animate-fadein">
+            <i class="fa-solid fa-circle-check"></i>
+            <h3>{{ sold_players }}</h3>
+            <p>Players Sold</p>
+        </div>
+    </div>
+</div>
+
+<div class="card content-card animate-fadein">
+    <div class="card-header">
+        <i class="fa-solid fa-wallet"></i> Team Budgets (Remaining out of 120 Cr)
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% for team in teams %}
+            <div class="col-md-3 col-sm-6">
+                <div class="budget-box">
+                    <h6>{{ team['name'] }}</h6>
+                    <div class="progress mb-2">
+                        {% set percent = (team['budget'] / 120 * 100) %}
+                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ percent }}%"></div>
+                    </div>
+                    <span class="budget-amount">₹{{ "%.2f"|format(team['budget']) }} Cr left</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

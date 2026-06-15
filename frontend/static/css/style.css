@@ -1,0 +1,680 @@
+/* ============ GLOBAL ============ */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #0f1320;
+    color: #eef0f5;
+}
+
+/* ============ AUTH PAGES (LOGIN / REGISTER) ============ */
+.auth-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    background: linear-gradient(135deg, #0f1320, #1a2238, #0b3d2e);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.auth-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+}
+
+.stadium-lights {
+    position: absolute;
+    top: -150px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, rgba(255, 215, 0, 0.15) 0%, transparent 70%);
+    animation: pulseLight 4s ease-in-out infinite;
+}
+
+@keyframes pulseLight {
+    0%, 100% { opacity: 0.4; transform: translateX(-50%) scale(1); }
+    50% { opacity: 0.8; transform: translateX(-50%) scale(1.1); }
+}
+
+.ball {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #ff6b6b, #b30000);
+    box-shadow: inset -5px -5px 10px rgba(0,0,0,0.4);
+    opacity: 0.7;
+}
+
+.ball::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #fff;
+    transform: rotate(20deg);
+}
+
+.ball1 { top: 15%; left: 10%; animation: floatBall 8s ease-in-out infinite; }
+.ball2 { top: 60%; left: 85%; width: 60px; height: 60px; animation: floatBall 10s ease-in-out infinite reverse; }
+.ball3 { top: 80%; left: 20%; width: 30px; height: 30px; animation: floatBall 7s ease-in-out infinite; }
+
+@keyframes floatBall {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-40px) rotate(180deg); }
+}
+
+.bat {
+    position: absolute;
+    width: 15px;
+    height: 150px;
+    background: linear-gradient(180deg, #d2a679, #8b5a2b);
+    border-radius: 8px;
+    opacity: 0.3;
+    top: 10%;
+    right: 8%;
+    transform: rotate(25deg);
+    animation: swayBat 6s ease-in-out infinite;
+}
+
+@keyframes swayBat {
+    0%, 100% { transform: rotate(25deg); }
+    50% { transform: rotate(40deg); }
+}
+
+/* ============ AUTH CARD ============ */
+.auth-container {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    max-width: 430px;
+    padding: 20px;
+}
+
+.auth-card {
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 18px;
+    padding: 40px 30px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    animation: slideUp 0.6s ease;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(40px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.auth-icon {
+    font-size: 50px;
+    color: #ffd700;
+    margin-bottom: 10px;
+    animation: bounceTrophy 2s ease-in-out infinite;
+}
+
+@keyframes bounceTrophy {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+
+.auth-header h2 {
+    color: #fff;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.auth-header p {
+    color: #b0b8c9;
+    font-size: 14px;
+}
+
+.auth-card .form-control {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #fff;
+}
+
+.auth-card .form-control:focus {
+    background: rgba(255,255,255,0.12);
+    border-color: #ffd700;
+    box-shadow: 0 0 0 3px rgba(255,215,0,0.15);
+    color: #fff;
+}
+
+.auth-card .form-floating label {
+    color: #b0b8c9;
+}
+
+.btn-auth {
+    background: linear-gradient(135deg, #ffd700, #ff8c00);
+    border: none;
+    color: #1a1a1a;
+    font-weight: 700;
+    padding: 12px;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    letter-spacing: 0.5px;
+}
+
+.btn-auth:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(255,215,0,0.4);
+    color: #000;
+}
+
+.auth-footer {
+    text-align: center;
+    margin-top: 20px;
+    color: #b0b8c9;
+    font-size: 14px;
+}
+
+.auth-footer a {
+    color: #ffd700;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* ============ NAVBAR ============ */
+.main-nav {
+    background: linear-gradient(135deg, #1a2238, #0b3d2e);
+    box-shadow: 0 2px 15px rgba(0,0,0,0.3);
+}
+
+.main-nav .navbar-brand {
+    font-weight: 700;
+    font-size: 20px;
+    color: #ffd700 !important;
+}
+
+.main-nav .nav-link {
+    color: #d8dce8 !important;
+    font-weight: 500;
+    transition: color 0.2s ease;
+    padding: 8px 14px !important;
+}
+
+.main-nav .nav-link:hover {
+    color: #ffd700 !important;
+}
+
+.admin-link {
+    color: #4ade80 !important;
+}
+
+.logout-link {
+    color: #ff6b6b !important;
+}
+
+/* ============ PAGE CONTENT ============ */
+.page-content {
+    animation: fadeInPage 0.5s ease;
+}
+
+@keyframes fadeInPage {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.page-header {
+    margin-bottom: 20px;
+}
+
+.page-header h2 {
+    font-weight: 700;
+    color: #fff;
+}
+
+.page-header p {
+    color: #99a1b3;
+}
+
+.animate-fadein {
+    animation: cardFadeIn 0.5s ease both;
+}
+
+@keyframes cardFadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============ STAT CARDS ============ */
+.stat-card {
+    border-radius: 14px;
+    padding: 22px;
+    text-align: center;
+    color: #fff;
+    transition: transform 0.25s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-card i {
+    font-size: 28px;
+    margin-bottom: 8px;
+}
+
+.stat-card h3 {
+    font-weight: 700;
+    margin: 5px 0;
+}
+
+.stat-card p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 14px;
+}
+
+.stat-blue { background: linear-gradient(135deg, #4f6df5, #2541b2); }
+.stat-green { background: linear-gradient(135deg, #1fbf75, #0c8a52); }
+.stat-orange { background: linear-gradient(135deg, #ff9f43, #e8590c); }
+.stat-purple { background: linear-gradient(135deg, #a06efc, #6a3cb5); }
+
+/* ============ CONTENT CARDS ============ */
+.content-card {
+    background: #181d30;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    color: #eef0f5;
+}
+
+.content-card .card-header {
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-weight: 600;
+    color: #ffd700;
+    border-radius: 14px 14px 0 0 !important;
+}
+
+.content-card .table {
+    color: #eef0f5;
+}
+
+.content-card .table thead {
+    color: #ffd700;
+}
+
+.content-card .table-hover tbody tr:hover {
+    background: rgba(255,255,255,0.04);
+    color: #fff;
+}
+
+/* ============ BUDGET BOXES ============ */
+.budget-box {
+    background: rgba(255,255,255,0.03);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+}
+
+.budget-box h6 {
+    color: #fff;
+    margin-bottom: 8px;
+}
+
+.budget-amount {
+    font-size: 13px;
+    color: #99a1b3;
+}
+
+.mini-budget-box {
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    margin-bottom: 8px;
+}
+
+.mini-budget-box strong {
+    color: #ffd700;
+}
+
+/* ============ ADMIN ACTION CARDS ============ */
+.admin-action-card {
+    display: block;
+    background: #181d30;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 25px;
+    text-align: center;
+    text-decoration: none;
+    color: #eef0f5;
+    transition: all 0.25s ease;
+}
+
+.admin-action-card:hover {
+    transform: translateY(-5px);
+    border-color: #ffd700;
+    color: #ffd700;
+}
+
+.admin-action-card i {
+    font-size: 32px;
+    margin-bottom: 10px;
+    color: #ffd700;
+}
+
+.admin-action-card h5 {
+    margin: 8px 0 4px;
+}
+
+.admin-action-card p {
+    font-size: 13px;
+    color: #99a1b3;
+    margin: 0;
+}
+
+.danger-card i { color: #ff6b6b; }
+.danger-card:hover { border-color: #ff6b6b; color: #ff6b6b; }
+
+/* ============ ROLE BADGES ============ */
+.role-badge {
+    font-size: 11px;
+    padding: 5px 10px;
+}
+
+.role-Batsman { background: #4f6df5; color: #fff; }
+.role-Bowler { background: #ff9f43; color: #fff; }
+.role-Allrounder { background: #1fbf75; color: #fff; }
+.role-Wicketkeeper { background: #a06efc; color: #fff; }
+
+/* ============ PLAYER THUMBS ============ */
+.player-thumb {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255,255,255,0.1);
+}
+
+.player-mini-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 10px;
+    padding: 10px;
+}
+
+.player-mini-card img {
+    width: 55px;
+    height: 55px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #ffd700;
+}
+
+.player-mini-card.flex-column {
+    flex-direction: column;
+    text-align: center;
+}
+
+/* ============ AUCTION CARD ============ */
+.auction-card {
+    min-height: 450px;
+}
+
+.auction-player-img {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid #ffd700;
+    box-shadow: 0 0 25px rgba(255,215,0,0.4);
+    animation: glowPulse 2s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+    0%, 100% { box-shadow: 0 0 15px rgba(255,215,0,0.3); }
+    50% { box-shadow: 0 0 35px rgba(255,215,0,0.6); }
+}
+
+.skill-box {
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 10px 5px;
+    margin: 5px;
+}
+
+.skill-box h5 {
+    color: #ffd700;
+    margin: 0;
+}
+
+.base-price {
+    color: #4ade80;
+}
+
+.btn-quick {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #fff;
+}
+
+.btn-quick:hover {
+    background: #ffd700;
+    color: #000;
+}
+
+/* ============ TEAM CARDS ============ */
+.team-card-link {
+    text-decoration: none;
+}
+
+.team-card {
+    border-radius: 14px;
+    padding: 25px 20px;
+    color: #fff;
+    text-align: center;
+    transition: transform 0.25s ease;
+    height: 100%;
+}
+
+.team-card:hover {
+    transform: translateY(-6px) scale(1.02);
+}
+
+.team-icon {
+    font-size: 36px;
+    margin-bottom: 10px;
+    opacity: 0.9;
+}
+
+.team-card h4 {
+    font-weight: 700;
+    margin-bottom: 15px;
+}
+
+.team-stats div {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    padding-bottom: 4px;
+}
+
+.team-color-1 { background: linear-gradient(135deg, #4f6df5, #2541b2); }
+.team-color-2 { background: linear-gradient(135deg, #1fbf75, #0c8a52); }
+.team-color-3 { background: linear-gradient(135deg, #ff9f43, #e8590c); }
+.team-color-0 { background: linear-gradient(135deg, #a06efc, #6a3cb5); }
+
+/* ============ POINTS TABLE ============ */
+.qualified-row {
+    background: rgba(31, 191, 117, 0.08);
+}
+
+/* ============ PLAYOFFS ============ */
+.qualifier-box {
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+    position: relative;
+}
+
+.rank-badge {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    background: #ffd700;
+    color: #000;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.match-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+}
+
+.match-team {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.03);
+}
+
+.winner-team {
+    background: rgba(31, 191, 117, 0.15);
+    border: 1px solid #1fbf75;
+}
+
+.match-team span {
+    font-size: 24px;
+    font-weight: 700;
+    color: #ffd700;
+}
+
+.vs-badge {
+    font-weight: 700;
+    color: #ff6b6b;
+    font-size: 18px;
+}
+
+.final-card {
+    border: 2px solid #ffd700;
+    box-shadow: 0 0 30px rgba(255,215,0,0.2);
+}
+
+/* ============ CHAMPION PAGE ============ */
+.champion-banner {
+    background: linear-gradient(135deg, #ffd700, #ff8c00);
+    border-radius: 18px;
+    padding: 50px 20px;
+    text-align: center;
+    color: #1a1a1a;
+    position: relative;
+    overflow: hidden;
+    animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+    0%, 100% { box-shadow: 0 0 30px rgba(255,215,0,0.4); }
+    50% { box-shadow: 0 0 60px rgba(255,215,0,0.7); }
+}
+
+.champion-trophy {
+    font-size: 70px;
+    animation: bounceTrophy 1.5s ease-in-out infinite;
+}
+
+.champion-banner h1 {
+    font-weight: 800;
+    margin: 15px 0;
+    font-size: 42px;
+}
+
+.confetti {
+    font-size: 28px;
+    display: block;
+    margin-top: 10px;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 768px) {
+    .champion-banner h1 { font-size: 28px; }
+    .champion-trophy { font-size: 50px; }
+    .match-row { flex-direction: column; gap: 10px; }
+    .vs-badge { order: 2; }
+    .auction-player-img { width: 110px; height: 110px; }
+    .stat-card h3 { font-size: 20px; }
+    .stat-card i { font-size: 22px; }
+}
+
+/* ============ AUCTION SUMMARY ============ */
+.summary-budget-row {
+    background: rgba(255,255,255,0.03);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.summary-player-list {
+    max-height: 320px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 4px;
+}
+
+.summary-player-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.summary-player-row img {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #ffd700;
+    flex-shrink: 0;
+}
+
+.summary-player-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.summary-player-list::-webkit-scrollbar-thumb {
+    background: rgba(255,215,0,0.4);
+    border-radius: 4px;
+}

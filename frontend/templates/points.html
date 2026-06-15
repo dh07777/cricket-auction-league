@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Points Table{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fadein">
+    <h2><i class="fa-solid fa-list-ol"></i> Points Table</h2>
+    <p>League standings - updated automatically after each match</p>
+</div>
+
+<div class="card content-card animate-fadein">
+    <div class="card-body table-responsive">
+        <table class="table table-hover align-middle text-center">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th class="text-start">Team</th>
+                    <th>Matches</th>
+                    <th>Wins</th>
+                    <th>Losses</th>
+                    <th>Points</th>
+                    <th>Edit</th>
+                </tr>
+            </thead>
+            <tbody id="pointsTableBody">
+                {% for team in teams %}
+                <tr class="{% if loop.index <= 4 %}qualified-row{% endif %}">
+                    <td>{{ loop.index }}</td>
+                    <td class="text-start"><strong>{{ team['name'] }}</strong> {% if loop.index <= 4 %}<span class="badge bg-success ms-1">Q</span>{% endif %}</td>
+                    <td id="mp-{{ team['id'] }}">{{ team['matches_played'] }}</td>
+                    <td id="w-{{ team['id'] }}">{{ team['wins'] }}</td>
+                    <td id="l-{{ team['id'] }}">{{ team['losses'] }}</td>
+                    <td id="pts-{{ team['id'] }}"><strong>{{ team['points'] }}</strong></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-warning"
+                            onclick="openPointsEditModal({{ team['id'] }}, '{{ team['name'] }}', {{ team['matches_played'] }}, {{ team['wins'] }}, {{ team['losses'] }})">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <small class="text-muted">Top 4 teams (highlighted) qualify for playoffs. Points are auto-calculated as Wins × 2.</small>
+    </div>
+</div>
+
+<!-- EDIT POINTS MODAL -->
+<div class="modal fade" id="editPointsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content content-card">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fa-solid fa-pen"></i> Edit Team Stats</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="pointsTeamName" class="text-muted"></p>
+                <div class="mb-3">
+                    <label class="form-label">Matches Played</label>
+                    <input type="number" id="editMatchesPlayed" class="form-control" min="0">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Wins</label>
+                    <input type="number" id="editWins" class="form-control" min="0">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Losses</label>
+                    <input type="number" id="editLosses" class="form-control" min="0">
+                </div>
+                <small class="text-muted">Points will be auto-calculated as Wins × 2.</small>
+                <div id="editPointsMessage" class="mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-auth" onclick="savePointsEdit()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let pointsEditContext = {};
+
+function openPointsEditModal(teamId, teamName, mp, wins, losses) {
+    pointsEditContext = { teamId };
+    document.getElementById('pointsTeamName').innerText = `Editing stats for ${teamName}`;
+    document.getElementById('editMatchesPlayed').value = mp;
+    document.getElementById('editWins').value = wins;
+    document.getElementById('editLosses').value = losses;
+    document.getElementById('editPointsMessage').innerHTML = '';
+
+    const modal = new bootstrap.Modal(document.getElementById('editPointsModal'));
+    modal.show();
+}
+
+function savePointsEdit() {
+    const matchesPlayed = document.getElementById('editMatchesPlayed').value;
+    const wins = document.getElementById('editWins').value;
+    const losses = document.getElementById('editLosses').value;
+
+    fetch('/api/points/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            team_id: pointsEditContext.teamId,
+            matches_played: matchesPlayed,
+            wins: wins,
+            losses: losses
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('editPointsMessage').innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+            setTimeout(() => location.reload(), 800);
+        } else {
+            document.getElementById('editPointsMessage').innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}League Matches{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fadein">
+    <h2><i class="fa-solid fa-baseball-bat-ball"></i> League Matches</h2>
+    <p>Round robin fixtures - all teams play each other once</p>
+</div>
+
+{% if session.get('user_id') %}
+<div class="d-flex gap-2 mb-4 flex-wrap">
+    <button class="btn btn-primary" onclick="generateLeague()"><i class="fa-solid fa-list-check"></i> Generate Fixtures</button>
+    <button class="btn btn-success" onclick="simulateLeague()"><i class="fa-solid fa-play"></i> Simulate All Matches</button>
+</div>
+<div id="leagueMessage" class="mb-3"></div>
+{% endif %}
+
+<div class="card content-card animate-fadein">
+    <div class="card-body table-responsive">
+        <table class="table table-hover align-middle text-center">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Team 1</th>
+                    <th>Score</th>
+                    <th>Team 2</th>
+                    <th>Score</th>
+                    <th>Winner</th>
+                    <th>Status</th>
+                    <th>Scorecard</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in matches %}
+                <tr id="matchRow{{ m['id'] }}">
+                    <td>{{ loop.index }}</td>
+                    <td>{{ m['team1_name'] }}</td>
+                    <td id="score1-{{ m['id'] }}">{{ m['team1_score'] if m['played'] else '-' }}</td>
+                    <td>{{ m['team2_name'] }}</td>
+                    <td id="score2-{{ m['id'] }}">{{ m['team2_score'] if m['played'] else '-' }}</td>
+                    <td id="winner-{{ m['id'] }}">{{ m['winner_name'] or '-' }}</td>
+                    <td id="status-{{ m['id'] }}">
+                        {% if m['played'] %}
+                            <span class="badge bg-success">Played</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1 flex-wrap justify-content-center">
+                            <button class="btn btn-sm btn-outline-primary" onclick="simulateSingleMatch({{ m['id'] }})">
+                                <i class="fa-solid fa-play"></i> Simulate
+                            </button>
+                            {% if m['played'] %}
+                            <a href="{{ url_for('sim.match_scorecard', match_id=m['id']) }}" class="btn btn-sm btn-outline-warning">
+                                <i class="fa-solid fa-list-ol"></i> Scorecard
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-muted">No fixtures generated yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function generateLeague() {
+    fetch('/api/league/generate', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('leagueMessage').innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+            setTimeout(() => location.reload(), 1000);
+        });
+}
+
+function simulateLeague() {
+    fetch('/api/league/simulate', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            const cls = data.success ? 'success' : 'danger';
+            document.getElementById('leagueMessage').innerHTML = `<div class="alert alert-${cls}">${data.message}</div>`;
+            if (data.success) setTimeout(() => location.reload(), 1000);
+        });
+}
+function simulateSingleMatch(matchId) {
+    if (!confirm("Simulate this match? Existing result (if any) will be overwritten.")) return;
+
+    fetch(`/api/match/simulate/${matchId}`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            const cls = data.success ? 'success' : 'danger';
+            document.getElementById('leagueMessage').innerHTML = `<div class="alert alert-${cls}">${data.message}</div>`;
+            if (data.success) setTimeout(() => location.reload(), 1000);
+        });
+}
+</script>
+{% endblock %}

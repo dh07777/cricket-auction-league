@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Teams{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fadein">
+    <h2><i class="fa-solid fa-people-group"></i> Teams</h2>
+    <p>All 8 franchise teams - budget 120 Crore each</p>
+</div>
+
+<div class="row g-4">
+    {% for team in teams %}
+    <div class="col-md-6 col-lg-3">
+        <a href="{{ url_for('team.team_detail', team_id=team['id']) }}" class="team-card-link">
+            <div class="team-card animate-fadein team-color-{{ loop.index % 4 }}">
+                <i class="fa-solid fa-shield-halved team-icon"></i>
+                <h4>{{ team['name'] }}</h4>
+                <div class="team-stats">
+                    <div><span>Budget Left</span><strong>₹{{ "%.2f"|format(team['budget']) }} Cr</strong></div>
+                    <div><span>Points</span><strong>{{ team['points'] }}</strong></div>
+                    <div><span>Record</span><strong>{{ team['wins'] }}W - {{ team['losses'] }}L</strong></div>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

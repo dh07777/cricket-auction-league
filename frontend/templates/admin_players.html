@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Manage Players{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fadein">
+    <h2><i class="fa-solid fa-user-pen"></i> Manage Players</h2>
+    <p>Add, edit, delete cricket players</p>
+</div>
+
+<div class="row">
+    <!-- ADD / EDIT PLAYER FORM -->
+    <div class="col-lg-4 mb-4">
+        <div class="card content-card animate-fadein">
+            <div class="card-header">
+                {% if edit_player %}
+                    <i class="fa-solid fa-pen"></i> Edit Player
+                {% else %}
+                    <i class="fa-solid fa-plus"></i> Add New Player
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <form method="POST"
+                    action="{% if edit_player %}{{ url_for('admin.edit_player', player_id=edit_player['id']) }}{% else %}{{ url_for('admin.add_player') }}{% endif %}">
+
+                    <div class="mb-3">
+                        <label class="form-label">Player Name</label>
+                        <input type="text" name="name" class="form-control" required
+                            value="{{ edit_player['name'] if edit_player else '' }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Role</label>
+                        <select name="role" class="form-select" required>
+                            {% set roles = ['Batsman', 'Bowler', 'All-rounder', 'Wicketkeeper'] %}
+                            {% for r in roles %}
+                            <option value="{{ r }}" {% if edit_player and edit_player['role'] == r %}selected{% endif %}>{{ r }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Overall Rating (1-100)</label>
+                        <input type="number" name="rating" min="1" max="100" class="form-control" required
+                            value="{{ edit_player['rating'] if edit_player else 60 }}">
+                    </div>
+
+                    <div class="row">
+                        <div class="col-4 mb-3">
+                            <label class="form-label">Batting</label>
+                            <input type="number" name="batting" min="1" max="100" class="form-control" required
+                                value="{{ edit_player['batting'] if edit_player else 50 }}">
+                        </div>
+                        <div class="col-4 mb-3">
+                            <label class="form-label">Bowling</label>
+                            <input type="number" name="bowling" min="1" max="100" class="form-control" required
+                                value="{{ edit_player['bowling'] if edit_player else 50 }}">
+                        </div>
+                        <div class="col-4 mb-3">
+                            <label class="form-label">Fielding</label>
+                            <input type="number" name="fielding" min="1" max="100" class="form-control" required
+                                value="{{ edit_player['fielding'] if edit_player else 50 }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Base Price (Crore)</label>
+                        <input type="number" step="0.1" name="base_price" class="form-control" required
+                            value="{{ edit_player['base_price'] if edit_player else 2.0 }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Image URL</label>
+                        <input type="text" name="image" class="form-control"
+                            value="{{ edit_player['image'] if edit_player else '' }}"
+                            placeholder="https://ui-avatars.com/api/?name=Player">
+                    </div>
+
+                    <button type="submit" class="btn btn-auth w-100">
+                        {% if edit_player %}
+                            <i class="fa-solid fa-save"></i> Update Player
+                        {% else %}
+                            <i class="fa-solid fa-plus"></i> Add Player
+                        {% endif %}
+                    </button>
+                    {% if edit_player %}
+                    <a href="{{ url_for('admin.admin_players') }}" class="btn btn-secondary w-100 mt-2">Cancel</a>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- PLAYERS LIST -->
+    <div class="col-lg-8">
+        <div class="card content-card animate-fadein">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span><i class="fa-solid fa-list"></i> All Players</span>
+                <form method="GET" class="d-flex gap-2 flex-wrap">
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search by name" value="{{ search }}">
+                    <select name="role" class="form-select form-select-sm">
+                        <option value="">All Roles</option>
+                        {% for r in ['Batsman', 'Bowler', 'All-rounder', 'Wicketkeeper'] %}
+                        <option value="{{ r }}" {% if role_filter == r %}selected{% endif %}>{{ r }}</option>
+                        {% endfor %}
+                    </select>
+                    <button class="btn btn-sm btn-light" type="submit"><i class="fa-solid fa-search"></i></button>
+                </form>
+            </div>
+            <div class="card-body table-responsive" style="max-height: 600px; overflow-y:auto;">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Image</th>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th>Rating</th>
+                            <th>Status</th>
+                            <th>Team</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in players %}
+                        <tr>
+                            <td><img src="{{ p['image'] }}" class="player-thumb" alt="{{ p['name'] }}"></td>
+                            <td>{{ p['name'] }}</td>
+                            <td><span class="badge role-badge role-{{ p['role']|replace(' ', '') }}">{{ p['role'] }}</span></td>
+                            <td>{{ p['rating'] }}</td>
+                            <td>
+                                {% if p['is_sold'] == 1 and p['team_id'] %}
+                                    <span class="badge bg-success">Sold ₹{{ p['sold_price'] }}Cr</span>
+                                {% elif p['is_sold'] == 1 %}
+                                    <span class="badge bg-secondary">Unsold</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">Available</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ p['team_name'] or '-' }}</td>
+                            <td>
+                                <a href="{{ url_for('admin.edit_player', player_id=p['id']) }}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen"></i></a>
+                                <a href="{{ url_for('admin.delete_player', player_id=p['id']) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this player?')"><i class="fa-solid fa-trash"></i></a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

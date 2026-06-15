@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ team['name'] }} - Squad{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fadein">
+    <h2><i class="fa-solid fa-shield-halved"></i> {{ team['name'] }}</h2>
+    <p>Team Squad & Budget Details</p>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-blue animate-fadein">
+            <i class="fa-solid fa-wallet"></i>
+            <h3>₹{{ "%.2f"|format(team['budget']) }} Cr</h3>
+            <p>Remaining Budget</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-green animate-fadein">
+            <i class="fa-solid fa-coins"></i>
+            <h3>₹{{ "%.2f"|format(spent) }} Cr</h3>
+            <p>Total Spent</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-orange animate-fadein">
+            <i class="fa-solid fa-users"></i>
+            <h3>{{ players|length }}</h3>
+            <p>Players Bought</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-purple animate-fadein">
+            <i class="fa-solid fa-list-ol"></i>
+            <h3>{{ team['points'] }}</h3>
+            <p>League Points</p>
+        </div>
+    </div>
+</div>
+
+<div class="card content-card animate-fadein">
+    <div class="card-header"><i class="fa-solid fa-users"></i> Squad List</div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% for p in players %}
+            <div class="col-md-4 col-sm-6">
+                <div class="player-mini-card">
+                    <img src="{{ p['image'] }}" alt="{{ p['name'] }}">
+                    <div>
+                        <h6>{{ p['name'] }}</h6>
+                        <span class="badge role-badge role-{{ p['role']|replace(' ', '') }}">{{ p['role'] }}</span>
+                        <div class="small mt-1">Rating: {{ p['rating'] }} | Bought: ₹{{ p['sold_price'] }} Cr</div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-12"><p class="text-center text-muted">No players bought yet.</p></div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: cricket-auction-league
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt && cd backend && python -c \"from models import init_db; init_db()\" && python seed_players.py"
+    startCommand: "cd backend && gunicorn --bind 0.0.0.0:$PORT app:app"
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true

@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}Match Scorecard{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fadein">
+    <h2><i class="fa-solid fa-baseball-bat-ball"></i> Match Scorecard</h2>
+    <p>Full 20-over ball-by-ball details</p>
+</div>
+
+<div class="card content-card mb-4 animate-fadein">
+    <div class="card-body">
+        <div class="match-row">
+            <div class="match-team {% if match['winner_name'] == match['team1_name'] %}winner-team{% endif %}">
+                <h4>{{ match['team1_name'] }}</h4>
+                <span>{{ match['team1_score'] }}/{{ wickets1 }}</span>
+                <small class="d-block text-muted">20 Overs</small>
+            </div>
+            <div class="vs-badge">VS</div>
+            <div class="match-team {% if match['winner_name'] == match['team2_name'] %}winner-team{% endif %}">
+                <h4>{{ match['team2_name'] }}</h4>
+                <span>{{ match['team2_score'] }}/{{ wickets2 }}</span>
+                <small class="d-block text-muted">20 Overs</small>
+            </div>
+        </div>
+        {% if match['winner_name'] %}
+        <p class="text-center mt-3 text-success"><i class="fa-solid fa-trophy"></i> Winner: <strong>{{ match['winner_name'] }}</strong></p>
+        {% endif %}
+        <p class="text-center text-muted small">Stage: {{ match['stage']|capitalize }}</p>
+    </div>
+</div>
+
+<!-- INNINGS 1 -->
+<!-- INNINGS 1 -->
+<div class="card content-card mb-4 animate-fadein">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="fa-solid fa-1"></i> Innings 1: {{ match['team1_name'] }} - <span id="totalDisplay1">{{ match['team1_score'] }}/{{ wickets1 }}</span> (20 Overs)</span>
+        <button class="btn btn-sm btn-outline-warning" onclick="openTotalEditModal({{ match['id'] }}, 1, {{ match['team1_score'] }}, {{ wickets1 }}, '{{ match['team1_name'] }}')">
+            <i class="fa-solid fa-pen"></i> Edit Total Score
+        </button>
+    </div>
+    <div class="card-body">
+        {% for over_num in over_range %}
+        <div class="over-row">
+            <div class="over-label">Over {{ over_num }}</div>
+            <div class="balls-list">
+                {% for ball_num in ball_range %}
+                    {% set ball = None %}
+                    {% for b in overs1.get(over_num, []) %}
+                        {% if b['ball_number'] == ball_num %}{% set ball = b %}{% endif %}
+                    {% endfor %}
+                    {% if ball %}
+                    <div class="ball-box {% if ball['is_wicket'] %}wicket-ball{% elif ball['runs'] == 4 %}four-ball{% elif ball['runs'] == 6 %}six-ball{% elif ball['runs'] == 0 %}dot-ball{% endif %}"
+                         onclick="openEditModal({{ match['id'] }}, 1, {{ over_num }}, {{ ball_num }}, {{ ball['runs'] }}, {{ ball['is_wicket'] }})">
+                        {% if ball['is_wicket'] %}W{% else %}{{ ball['runs'] }}{% endif %}
+                    </div>
+                    {% else %}
+                    <div class="ball-box" onclick="openEditModal({{ match['id'] }}, 1, {{ over_num }}, {{ ball_num }}, 0, 0)">-</div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <div class="over-total">
+                = {% set over_runs = 0 %}{% for b in overs1.get(over_num, []) %}{% set over_runs = over_runs + b['runs'] %}{% endfor %}{{ over_runs }} runs
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- INNINGS 2 -->
+<!-- INNINGS 2 -->
+<div class="card content-card mb-4 animate-fadein">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="fa-solid fa-2"></i> Innings 2: {{ match['team2_name'] }} - <span id="totalDisplay2">{{ match['team2_score'] }}/{{ wickets2 }}</span> (20 Overs)</span>
+        <button class="btn btn-sm btn-outline-warning" onclick="openTotalEditModal({{ match['id'] }}, 2, {{ match['team2_score'] }}, {{ wickets2 }}, '{{ match['team2_name'] }}')">
+            <i class="fa-solid fa-pen"></i> Edit Total Score
+        </button>
+    </div>
+    <div class="card-body">
+        {% for over_num in over_range %}
+        <div class="over-row">
+            <div class="over-label">Over {{ over_num }}</div>
+            <div class="balls-list">
+                {% for ball_num in ball_range %}
+                    {% set ball = None %}
+                    {% for b in overs2.get(over_num, []) %}
+                        {% if b['ball_number'] == ball_num %}{% set ball = b %}{% endif %}
+                    {% endfor %}
+                    {% if ball %}
+                    <div class="ball-box {% if ball['is_wicket'] %}wicket-ball{% elif ball['runs'] == 4 %}four-ball{% elif ball['runs'] == 6 %}six-ball{% elif ball['runs'] == 0 %}dot-ball{% endif %}"
+                         onclick="openEditModal({{ match['id'] }}, 2, {{ over_num }}, {{ ball_num }}, {{ ball['runs'] }}, {{ ball['is_wicket'] }})">
+                        {% if ball['is_wicket'] %}W{% else %}{{ ball['runs'] }}{% endif %}
+                    </div>
+                    {% else %}
+                    <div class="ball-box" onclick="openEditModal({{ match['id'] }}, 2, {{ over_num }}, {{ ball_num }}, 0, 0)">-</div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <div class="over-total">
+                = {% set over_runs = 0 %}{% for b in overs2.get(over_num, []) %}{% set over_runs = over_runs + b['runs'] %}{% endfor %}{{ over_runs }} runs
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- EDIT BALL MODAL -->
+<!-- EDIT TOTAL SCORE MODAL -->
+<div class="modal fade" id="editTotalModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content content-card">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fa-solid fa-pen"></i> Edit Total Score</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="totalInfoText" class="text-muted"></p>
+                <div class="mb-3">
+                    <label class="form-label">Total Runs</label>
+                    <input type="number" id="editTotalRuns" class="form-control" min="0">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Total Wickets (0-10)</label>
+                    <input type="number" id="editTotalWickets" class="form-control" min="0" max="10">
+                </div>
+                <small class="text-muted">Ball-by-ball data will be auto-adjusted to match these totals. Winner & Points Table will update automatically.</small>
+                <div id="editTotalMessage" class="mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-auth" onclick="saveTotalScore()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- EDIT BALL MODAL -->
+<div class="modal fade" id="editBallModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content content-card">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fa-solid fa-pen"></i> Edit Ball</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="ballInfoText" class="text-muted"></p>
+                <div class="mb-3">
+                    <label class="form-label">Runs Scored (0-6)</label>
+                    <input type="number" id="editRuns" class="form-control" min="0" max="6">
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="editWicket">
+                    <label class="form-check-label" for="editWicket">Wicket on this ball</label>
+                </div>
+                <div id="editBallMessage"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-auth" onclick="saveBall()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.over-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    flex-wrap: wrap;
+}
+.over-label {
+    width: 80px;
+    font-weight: 700;
+    color: #ffd700;
+    font-size: 13px;
+}
+.balls-list {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.ball-box {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.ball-box:hover {
+    transform: scale(1.15);
+    border-color: #ffd700;
+}
+.dot-ball { background: rgba(255,255,255,0.03); color: #888; }
+.four-ball { background: rgba(31,191,117,0.25); color: #4ade80; }
+.six-ball { background: rgba(255,215,0,0.25); color: #ffd700; }
+.wicket-ball { background: rgba(255,107,107,0.3); color: #ff6b6b; }
+.over-total {
+    margin-left: auto;
+    font-size: 13px;
+    color: #99a1b3;
+    min-width: 80px;
+    text-align: right;
+}
+@media (max-width: 768px) {
+    .over-label { width: 60px; font-size: 11px; }
+    .ball-box { width: 28px; height: 28px; font-size: 11px; }
+    .over-total { width: 100%; text-align: left; margin-left: 70px; }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let editContext = {};
+
+function openEditModal(matchId, innings, over, ball, runs, isWicket) {
+    editContext = { matchId, innings, over, ball };
+    document.getElementById('ballInfoText').innerText =
+        `Innings ${innings} - Over ${over}, Ball ${ball}`;
+    document.getElementById('editRuns').value = runs;
+    document.getElementById('editWicket').checked = isWicket === 1;
+    document.getElementById('editBallMessage').innerHTML = '';
+
+    const modal = new bootstrap.Modal(document.getElementById('editBallModal'));
+    modal.show();
+}
+
+function saveBall() {
+    const runs = document.getElementById('editRuns').value;
+    const isWicket = document.getElementById('editWicket').checked;
+
+    fetch('/api/match/update-ball', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            match_id: editContext.matchId,
+            innings: editContext.innings,
+            over_number: editContext.over,
+            ball_number: editContext.ball,
+            runs: runs,
+            is_wicket: isWicket
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('editBallMessage').innerHTML = `<div class="alert alert-success">Saved!</div>`;
+            setTimeout(() => location.reload(), 700);
+        } else {
+            document.getElementById('editBallMessage').innerHTML = `<div class="alert alert-danger">Failed to save.</div>`;
+        }
+    });
+}
+let totalEditContext = {};
+
+function openTotalEditModal(matchId, innings, currentRuns, currentWickets, teamName) {
+    totalEditContext = { matchId, innings };
+    document.getElementById('totalInfoText').innerText = `Editing total score for ${teamName} (Innings ${innings})`;
+    document.getElementById('editTotalRuns').value = currentRuns;
+    document.getElementById('editTotalWickets').value = currentWickets;
+    document.getElementById('editTotalMessage').innerHTML = '';
+
+    const modal = new bootstrap.Modal(document.getElementById('editTotalModal'));
+    modal.show();
+}
+
+function saveTotalScore() {
+    const totalRuns = document.getElementById('editTotalRuns').value;
+    const totalWickets = document.getElementById('editTotalWickets').value;
+
+    fetch('/api/match/update-total', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            match_id: totalEditContext.matchId,
+            innings: totalEditContext.innings,
+            total_runs: totalRuns,
+            total_wickets: totalWickets
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('editTotalMessage').innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+            setTimeout(() => location.reload(), 800);
+        } else {
+            document.getElementById('editTotalMessage').innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+        }
+    });
+}
+</script>
+{% endblock %}

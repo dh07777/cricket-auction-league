@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block title %}Live Auction{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fadein">
+    <h2><i class="fa-solid fa-gavel"></i> Live Auction</h2>
+    <p>Players Remaining: <span id="remainingCount">{{ remaining }}</span> | Sold: <span id="soldCount">{{ sold }}</span></p>
+</div>
+
+<div class="row">
+    <!-- CURRENT PLAYER CARD -->
+    <div class="col-lg-5 mb-4">
+        <div class="card content-card auction-card animate-fadein" id="playerCard">
+            {% if player %}
+            <div class="text-center p-3">
+                <img src="{{ player['image'] }}" id="playerImg" class="auction-player-img mb-3" alt="{{ player['name'] }}">
+                <h3 id="playerName">{{ player['name'] }}</h3>
+                <span class="badge role-badge role-{{ player['role']|replace(' ', '') }} mb-2" id="playerRole">{{ player['role'] }}</span>
+
+                <div class="row text-center mt-3">
+                    <div class="col-4">
+                        <div class="skill-box"><h5 id="playerRating">{{ player['rating'] }}</h5><small>Overall</small></div>
+                    </div>
+                    <div class="col-4">
+                        <div class="skill-box"><h5 id="playerBatting">{{ player['batting'] }}</h5><small>Batting</small></div>
+                    </div>
+                    <div class="col-4">
+                        <div class="skill-box"><h5 id="playerBowling">{{ player['bowling'] }}</h5><small>Bowling</small></div>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <div class="skill-box w-50 mx-auto"><h5 id="playerFielding">{{ player['fielding'] }}</h5><small>Fielding</small></div>
+                </div>
+
+                <h4 class="mt-3 base-price">Base Price: ₹<span id="playerBasePrice">{{ player['base_price'] }}</span> Cr</h4>
+                <input type="hidden" id="playerId" value="{{ player['id'] }}">
+            </div>
+            {% else %}
+            <div class="text-center p-5">
+                <i class="fa-solid fa-circle-check fa-3x text-success mb-3"></i>
+                <h4>All players have been auctioned!</h4>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- BIDDING PANEL -->
+    <div class="col-lg-7">
+        <div class="card content-card animate-fadein">
+            <div class="card-header"><i class="fa-solid fa-hand-holding-dollar"></i> Place Bid</div>
+            <div class="card-body">
+                {% if session.get('user_id') %}
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Select Team</label>
+                        <select id="teamSelect" class="form-select">
+                            {% for team in teams %}
+                            <option value="{{ team['id'] }}" data-budget="{{ team['budget'] }}">{{ team['name'] }} (₹{{ "%.2f"|format(team['budget']) }} Cr left)</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Bid Amount (Crore)</label>
+                        <input type="number" id="bidAmount" class="form-control" step="0.1" min="2" value="2">
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap mb-3">
+                    <button class="btn btn-quick" onclick="quickBid(0.5)">+0.5 Cr</button>
+                    <button class="btn btn-quick" onclick="quickBid(1)">+1 Cr</button>
+                    <button class="btn btn-quick" onclick="quickBid(2)">+2 Cr</button>
+                    <button class="btn btn-quick" onclick="quickBid(5)">+5 Cr</button>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap mb-3">
+                    <button class="btn btn-success btn-lg flex-fill" onclick="sellPlayer()">
+                        <i class="fa-solid fa-hammer"></i> SOLD
+                    </button>
+                    <button class="btn btn-danger btn-lg flex-fill" onclick="unsoldPlayer()">
+                        <i class="fa-solid fa-ban"></i> UNSOLD
+                    </button>
+                    <button class="btn btn-primary btn-lg flex-fill" onclick="nextPlayer()">
+                        <i class="fa-solid fa-forward"></i> Next Player
+                    </button>
+                </div>
+
+                <hr class="my-3" style="border-color: rgba(255,255,255,0.1);">
+
+                <div class="text-center">
+                    <button class="btn btn-warning btn-lg w-100" onclick="autoSimulateAuction()" id="autoSimBtn">
+                        <i class="fa-solid fa-bolt"></i> Auto Simulate Entire Auction
+                    </button>
+                    <small class="text-muted d-block mt-2">Automatically auctions all remaining players to random teams based on ratings & budgets.</small>
+                </div>
+                {% else %}
+
+                <div class="alert alert-info">Only Admin can manage live bidding. You are viewing live auction updates.</div>
+                <button class="btn btn-primary btn-lg w-100" onclick="nextPlayer()">
+                    <i class="fa-solid fa-forward"></i> View Next Player
+                </button>
+                {% endif %}
+
+                <div id="auctionMessage" class="mt-3"></div>
+            </div>
+        </div>
+
+        <!-- TEAM BUDGETS QUICK VIEW -->
+        <div class="card content-card mt-3 animate-fadein">
+            <div class="card-header"><i class="fa-solid fa-wallet"></i> Team Budgets</div>
+            <div class="card-body">
+                <div class="row g-2" id="teamBudgetList">
+                    {% for team in teams %}
+                    <div class="col-6 col-md-3">
+                        <div class="mini-budget-box">
+                            <strong>{{ team['name'] }}</strong>
+                            <div>₹{{ "%.2f"|format(team['budget']) }} Cr</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function quickBid(amount) {
+    const bidInput = document.getElementById('bidAmount');
+    bidInput.value = (parseFloat(bidInput.value) + amount).toFixed(1);
+}
+
+function nextPlayer() {
+    fetch('/api/auction/next')
+        .then(res => res.json())
+        .then(data => {
+            if (data.done) {
+                document.getElementById('playerCard').innerHTML = `
+                    <div class="text-center p-5">
+                        <i class="fa-solid fa-circle-check fa-3x text-success mb-3"></i>
+                        <h4>All players have been auctioned!</h4>
+                    </div>`;
+                return;
+            }
+            document.getElementById('playerImg') && (document.getElementById('playerImg').src = data.image);
+            document.getElementById('playerName').innerText = data.name;
+            document.getElementById('playerRole').innerText = data.role;
+            document.getElementById('playerRole').className = 'badge role-badge role-' + data.role.replace(' ', '') + ' mb-2';
+            document.getElementById('playerRating').innerText = data.rating;
+            document.getElementById('playerBatting').innerText = data.batting;
+            document.getElementById('playerBowling').innerText = data.bowling;
+            document.getElementById('playerFielding').innerText = data.fielding;
+            document.getElementById('playerBasePrice').innerText = data.base_price;
+            document.getElementById('playerId').value = data.id;
+            document.getElementById('remainingCount').innerText = data.remaining;
+
+            const bidInput = document.getElementById('bidAmount');
+            if (bidInput) bidInput.value = data.base_price;
+
+            document.getElementById('auctionMessage').innerHTML = '';
+        });
+}
+
+function sellPlayer() {
+    const playerId = document.getElementById('playerId').value;
+    const teamSelect = document.getElementById('teamSelect');
+    const teamId = teamSelect.value;
+    const bidAmount = document.getElementById('bidAmount').value;
+
+    fetch('/api/auction/sell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player_id: playerId, team_id: teamId, sold_price: bidAmount })
+    })
+    .then(res => res.json())
+    .then(data => {
+        const msgBox = document.getElementById('auctionMessage');
+        if (data.success) {
+            msgBox.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+            setTimeout(nextPlayer, 1000);
+        } else {
+            msgBox.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+        }
+    });
+}
+
+function unsoldPlayer() {
+    const playerId = document.getElementById('playerId').value;
+    fetch('/api/auction/unsold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player_id: playerId })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('auctionMessage').innerHTML = `<div class="alert alert-warning">Player marked unsold.</div>`;
+            setTimeout(nextPlayer, 800);
+        }
+    });
+}
+function autoSimulateAuction() {
+    if (!confirm("This will auto-auction ALL remaining players randomly to teams. Continue?")) {
+        return;
+    }
+
+    const btn = document.getElementById('autoSimBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Simulating Auction...';
+
+    fetch('/api/auction/auto-simulate', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            const msgBox = document.getElementById('auctionMessage');
+            const cls = data.success ? 'success' : 'danger';
+            msgBox.innerHTML = `<div class="alert alert-${cls}">${data.message}</div>`;
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Auto Simulate Entire Auction';
+
+            if (data.success) {
+                setTimeout(() => {
+                    window.location.href = "/auction/summary";
+                }, 1500);
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Auto Simulate Entire Auction';
+        });
+}
+</script>
+{% endblock %}

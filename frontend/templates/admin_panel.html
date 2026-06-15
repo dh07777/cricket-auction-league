@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fadein">
+    <h2><i class="fa-solid fa-user-shield"></i> Admin Panel</h2>
+    <p>Manage players, run auction & league simulation</p>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4">
+        <div class="stat-card stat-blue animate-fadein">
+            <i class="fa-solid fa-users"></i>
+            <h3>{{ total_players }}</h3>
+            <p>Total Players</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="stat-card stat-green animate-fadein">
+            <i class="fa-solid fa-people-group"></i>
+            <h3>{{ total_teams }}</h3>
+            <p>Total Teams</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="stat-card stat-orange animate-fadein">
+            <i class="fa-solid fa-gavel"></i>
+            <h3>{{ sold }}</h3>
+            <p>Players Sold</p>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <a href="{{ url_for('admin.admin_players') }}" class="admin-action-card animate-fadein">
+            <i class="fa-solid fa-user-pen"></i>
+            <h5>Manage Players</h5>
+            <p>Add, edit or delete players</p>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{{ url_for('auction.auction') }}" class="admin-action-card animate-fadein">
+            <i class="fa-solid fa-gavel"></i>
+            <h5>Start Auction</h5>
+            <p>Run live player auction</p>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{{ url_for('team.teams') }}" class="admin-action-card animate-fadein">
+            <i class="fa-solid fa-shield-halved"></i>
+            <h5>View Teams</h5>
+            <p>Team squads & budgets</p>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{{ url_for('team.matches') }}" class="admin-action-card animate-fadein">
+            <i class="fa-solid fa-baseball-bat-ball"></i>
+            <h5>League Matches</h5>
+            <p>Generate & simulate fixtures</p>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{{ url_for('sim.playoffs_page') }}" class="admin-action-card animate-fadein">
+            <i class="fa-solid fa-medal"></i>
+            <h5>Playoffs</h5>
+            <p>Semifinals & Final</p>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{{ url_for('admin.reset_auction') }}" class="admin-action-card danger-card animate-fadein" onclick="return confirm('This will reset ALL auction, teams & matches data. Continue?')">
+            <i class="fa-solid fa-rotate-left"></i>
+            <h5>Reset Everything</h5>
+            <p>Reset auction, budgets & matches</p>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="#" class="admin-action-card danger-card animate-fadein" onclick="resetLiveRoom(); return false;">
+            <i class="fa-solid fa-tower-broadcast"></i>
+            <h5>Reset Live Auction Room</h5>
+            <p>Clear all seats & live auction state</p>
+        </a>
+    </div>
+</div>
+
+<div id="liveResetMessage" class="mt-3"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function resetLiveRoom() {
+    if (!confirm("This will remove all 8 seat claims and reset the live auction room. Continue?")) {
+        return;
+    }
+
+    fetch('/api/live/reset-room', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            const cls = data.success ? 'success' : 'danger';
+            document.getElementById('liveResetMessage').innerHTML =
+                `<div class="alert alert-${cls}">${data.message}</div>`;
+        })
+        .catch(() => {
+            document.getElementById('liveResetMessage').innerHTML =
+                `<div class="alert alert-danger">Failed to reset live room.</div>`;
+        });
+}
+</script>
+{% endblock %}

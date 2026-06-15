@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% block title %}Live Auction Room{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fadein">
+    <h2><i class="fa-solid fa-tower-broadcast"></i> Live Auction Room</h2>
+    <p>First 8 users claim a team and bid live — 5 second countdown per bid!</p>
+</div>
+
+{% if not my_seat %}
+<!-- SEAT SELECTION SCREEN -->
+<div class="card content-card animate-fadein">
+    <div class="card-header">
+        <i class="fa-solid fa-chair"></i> Claim Your Team ({{ seats_taken }}/{{ max_seats }} seats taken)
+    </div>
+    <div class="card-body">
+        {% if seats_taken >= max_seats %}
+        <div class="alert alert-danger">All 8 seats are taken! You can spectate the live auction below.</div>
+        {% else %}
+        <div class="row g-3" id="teamSeatGrid">
+            {% for t in available_teams %}
+            <div class="col-md-3 col-6">
+                <button class="seat-team-btn" onclick="claimSeat({{ t['id'] }})">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <h6>{{ t['name'] }}</h6>
+                    <small>₹{{ "%.2f"|format(t['budget']) }} Cr</small>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div id="seatMessage" class="mt-3"></div>
+
+        <hr class="my-3" style="border-color: rgba(255,255,255,0.1);">
+        <h6>Claimed Seats:</h6>
+        <div class="row g-2">
+            {% for s in all_seats %}
+            <div class="col-md-3 col-6">
+                <div class="mini-budget-box">
+                    <strong>{{ s['team_name'] }}</strong>
+                    <div><i class="fa-solid fa-user"></i> {{ s['username'] }}</div>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-muted">No seats claimed yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- LIVE AUCTION ROOM -->
+<div class="row mb-3">
+    <div class="col-md-8">
+        <div class="alert alert-success mb-0">
+            <i class="fa-solid fa-circle-check"></i> You are bidding for <strong>{{ my_seat['team_name'] if my_seat['team_name'] else '' }}</strong>
+            <span id="mySeatTeam"></span>
+        </div>
+    </div>
+    <div class="col-md-4 text-end">
+        <button class="btn btn-danger" onclick="leaveSeat()"><i class="fa-solid fa-door-open"></i> Leave Seat</button>
+    </div>
+</div>
+
+<div class="row">
+    <!-- CURRENT PLAYER -->
+    <div class="col-lg-5 mb-4">
+        <div class="card content-card auction-card animate-fadein" id="liveCardWrapper">
+            <div class="text-center p-4" id="liveContent">
+                <button class="btn btn-warning btn-lg" onclick="startAuction()" id="startBtn">
+                    <i class="fa-solid fa-play"></i> Start Live Auction
+                </button>
+                <p class="text-muted mt-3">Click to begin - random players will appear with a 5 second bidding timer.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- BIDDING PANEL -->
+    <div class="col-lg-7">
+        <div class="card content-card animate-fadein">
+            <div class="card-header"><i class="fa-solid fa-hand-holding-dollar"></i> Live Bidding</div>
+            <div class="card-body">
+                <div class="text-center mb-3">
+                    <h6>Remaining Players: <span id="remainingCount">-</span></h6>
+                    <h6>Current Highest Bidder: <span id="currentBidTeam" class="text-warning">-</span></h6>
+                    <h4>Current Bid: ₹<span id="currentBidAmount">0</span> Cr</h4>
+                    <div class="timer-circle" id="timerDisplay">5</div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-8">
+                        <input type="number" id="myBidAmount" class="form-control" step="0.5" min="0" placeholder="Your bid amount (Cr)">
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-success w-100" onclick="placeBid()"><i class="fa-solid fa-gavel"></i> Bid</button>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap mb-3">
+                    <button class="btn btn-quick" onclick="quickRaise(0.5)">+0.5 Cr</button>
+                    <button class="btn btn-quick" onclick="quickRaise(1)">+1 Cr</button>
+                    <button class="btn btn-quick" onclick="quickRaise(2)">+2 Cr</button>
+                    <button class="btn btn-quick" onclick="quickRaise(5)">+5 Cr</button>
+                </div>
+
+                <div id="liveMessage"></div>
+            </div>
+        </div>
+
+        <!-- TEAM BUDGETS -->
+        <div class="card content-card mt-3 animate-fadein">
+            <div class="card-header"><i class="fa-solid fa-people-group"></i> Team Owners & Budgets</div>
+            <div class="card-body">
+                <div class="row g-2" id="teamOwnerList">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.seat-team-btn {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 18px 10px;
+    color: #eef0f5;
+    text-align: center;
+    transition: all 0.25s ease;
+    cursor: pointer;
+}
+.seat-team-btn:hover {
+    border-color: #ffd700;
+    color: #ffd700;
+    transform: translateY(-4px);
+}
+.seat-team-btn i {
+    font-size: 24px;
+    margin-bottom: 6px;
+    display: block;
+}
+.timer-circle {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff6b6b, #b30000);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 800;
+    color: #fff;
+    margin: 10px auto;
+    box-shadow: 0 0 20px rgba(255,107,107,0.5);
+    animation: pulseTimer 1s ease-in-out infinite;
+}
+@keyframes pulseTimer {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+}
+.owner-box {
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+}
+.owner-box.active-bidder {
+    border: 2px solid #ffd700;
+    background: rgba(255,215,0,0.1);
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let pollInterval = null;
+let countdownInterval = null;
+let currentTimerEnd = 0;
+
+// ---------------- CLAIM SEAT ----------------
+function claimSeat(teamId) {
+    fetch('/api/live/claim-seat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ team_id: teamId })
+    })
+    .then(res => res.json())
+    .then(data => {
+        const msgBox = document.getElementById('seatMessage');
+        const cls = data.success ? 'success' : 'danger';
+        msgBox.innerHTML = `<div class="alert alert-${cls}">${data.message}</div>`;
+        if (data.success) {
+            setTimeout(() => location.reload(), 800);
+        }
+    });
+}
+
+// ---------------- LEAVE SEAT ----------------
+function leaveSeat() {
+    if (!confirm("Leave your team seat?")) return;
+    fetch('/api/live/leave-seat', { method: 'POST' })
+        .then(res => res.json())
+        .then(() => location.reload());
+}
+
+// ---------------- START AUCTION ----------------
+function startAuction() {
+    fetch('/api/live/start', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) {
+                document.getElementById('liveMessage').innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                return;
+            }
+            startPolling();
+        });
+}
+
+// ---------------- QUICK RAISE BUTTONS ----------------
+function quickRaise(amount) {
+    const currentBid = parseFloat(document.getElementById('currentBidAmount').innerText) || 0;
+    document.getElementById('myBidAmount').value = (currentBid + amount).toFixed(1);
+}
+
+// ---------------- PLACE BID ----------------
+function placeBid() {
+    const bidAmount = document.getElementById('myBidAmount').value;
+    if (!bidAmount) return;
+
+    fetch('/api/live/bid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bid_amount: bidAmount })
+    })
+    .then(res => res.json())
+    .then(data => {
+        const msgBox = document.getElementById('liveMessage');
+        const cls = data.success ? 'success' : 'danger';
+        msgBox.innerHTML = `<div class="alert alert-${cls}">${data.message}</div>`;
+        setTimeout(() => { msgBox.innerHTML = ''; }, 2000);
+    });
+}
+
+// ---------------- POLL LIVE STATE ----------------
+function startPolling() {
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(fetchState, 1000);
+    fetchState();
+}
+
+function fetchState() {
+    fetch('/api/live/state')
+        .then(res => res.json())
+        .then(data => {
+            updateUI(data);
+
+            // Check if timer expired -> trigger finalize
+            const now = data.server_time;
+            if (data.status === 'live' && now > data.timer_end) {
+                fetch('/api/live/check-timer', { method: 'POST' })
+                    .then(res => res.json())
+                    .then(result => {
+                        if (result.finalized) {
+                            document.getElementById('liveMessage').innerHTML =
+                                `<div class="alert alert-info">${result.message}</div>`;
+                        }
+                    });
+            }
+
+            if (data.status === 'finished') {
+                clearInterval(pollInterval);
+                document.getElementById('liveContent').innerHTML = `
+                    <i class="fa-solid fa-circle-check fa-3x text-success mb-3"></i>
+                    <h4>Auction Completed!</h4>
+                    <a href="/auction/summary" class="btn btn-auth mt-2">View Summary</a>
+                `;
+            }
+        });
+}
+
+// ---------------- UPDATE UI ----------------
+function updateUI(data) {
+    document.getElementById('remainingCount').innerText = data.remaining;
+    document.getElementById('currentBidAmount').innerText = data.current_bid.toFixed(1);
+    document.getElementById('currentBidTeam').innerText = data.current_bid_team || 'No bids yet';
+
+    // Countdown timer
+    const remaining = Math.max(0, Math.ceil(data.timer_end - data.server_time));
+    document.getElementById('timerDisplay').innerText = remaining;
+
+    // Player card
+    if (data.player) {
+        document.getElementById('liveContent').innerHTML = `
+            <img src="${data.player.image}" class="auction-player-img mb-3" alt="${data.player.name}">
+            <h3>${data.player.name}</h3>
+            <span class="badge role-badge role-${data.player.role.replace(' ', '')} mb-2">${data.player.role}</span>
+            <div class="row text-center mt-3">
+                <div class="col-4"><div class="skill-box"><h5>${data.player.rating}</h5><small>Overall</small></div></div>
+                <div class="col-4"><div class="skill-box"><h5>${data.player.batting}</h5><small>Batting</small></div></div>
+                <div class="col-4"><div class="skill-box"><h5>${data.player.bowling}</h5><small>Bowling</small></div></div>
+            </div>
+            <h4 class="mt-3 base-price">Base Price: ₹${data.player.base_price} Cr</h4>
+        `;
+    }
+
+    // Team owners list
+    const ownerList = document.getElementById('teamOwnerList');
+    if (data.teams && data.teams.length > 0) {
+        ownerList.innerHTML = data.teams.map(t => `
+            <div class="col-md-3 col-6">
+                <div class="owner-box ${data.current_bid_team_id === t.team_id ? 'active-bidder' : ''}">
+                    <strong>${t.name}</strong>
+                    <div><i class="fa-solid fa-user"></i> ${t.username}</div>
+                    <div class="text-warning">₹${t.budget.toFixed(1)} Cr</div>
+                </div>
+            </div>
+        `).join('');
+    }
+}
+
+// ---------------- INIT ON PAGE LOAD ----------------
+document.addEventListener('DOMContentLoaded', function () {
+    {% if my_seat %}
+    startPolling();
+    {% endif %}
+});
+</script>
+{% endblock %}
