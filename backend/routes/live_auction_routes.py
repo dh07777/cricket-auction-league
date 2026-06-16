@@ -1,47 +1,48 @@
 import time
 import random
-from flask import Blueprint, render_template, request, session, jsonify, redirect, url_for, flash
-from models import get_db_connection
+from flask import Blueprint, render_template, request, session, jsonify
+from models import get_db_connection, get_cursor
 from routes.admin_routes import login_required, admin_required
 
 live_bp = Blueprint("live", __name__)
 
-BID_TIMER_SECONDS = 5  # countdown duration after each bid
+BID_TIMER_SECONDS = 5
 
 
-# ---------------- LIVE AUCTION ROOM PAGE ----------------
 @live_bp.route("/live-auction")
 @login_required
 def live_auction_room():
     conn = get_db_connection()
+    cur = get_cursor(conn)
 
-    # Check if user already has a seat
-    my_seat = conn.execute("SELECT * FROM auction_seats WHERE user_id = ?", (session["user_id"],)).fetchone()
+    cur.execute("SELECT * FROM auction_seats WHERE user_id = %s", (session["user_id"],))
+    my_seat = cur.fetchone()
 
-    seats_taken = conn.execute("SELECT COUNT(*) FROM auction_seats").fetchone()[0]
-    all_seats = conn.execute("""
+    cur.execute("SELECT COUNT(*) as c FROM auction_seats")
+    seats_taken = cur.fetchone()["c"]
+
+    cur.execute("""
         SELECT auction_seats.*, teams.name as team_name
         FROM auction_seats JOIN teams ON auction_seats.team_id = teams.id
-    """).fetchall()
+    """)
+    all_seats = cur.fetchall()
 
-    # Available teams (not yet claimed)
     claimed_team_ids = [s["team_id"] for s in all_seats]
-    available_teams = conn.execute("SELECT * FROM teams").fetchall()
-    available_teams = [t for t in available_teams if t["id"] not in claimed_team_ids]
+    cur.execute("SELECT * FROM teams")
+    all_teams = cur.fetchall()
+    available_teams = [t for t in all_teams if t["id"] not in claimed_team_ids]
 
+    cur.close()
     conn.close()
 
-    return render_template(
-        "live_auction.html",
+    return render_template("live_auction.html",
         my_seat=my_seat,
         seats_taken=seats_taken,
         all_seats=all_seats,
         available_teams=available_teams,
-        max_seats=8
-    )
+        max_seats=8)
 
 
-# ---------------- CLAIM A TEAM SEAT ----------------
 @live_bp.route("/api/live/claim-seat", methods=["POST"])
 @login_required
 def claim_seat():
@@ -49,87 +50,96 @@ def claim_seat():
     team_id = data.get("team_id")
 
     conn = get_db_connection()
+    cur = get_cursor(conn)
 
-    # Check seat limit
-    seats_taken = conn.execute("SELECT COUNT(*) FROM auction_seats").fetchone()[0]
+    cur.execute("SELECT COUNT(*) as c FROM auction_seats")
+    seats_taken = cur.fetchone()["c"]
+
     if seats_taken >= 8:
+        cur.close()
         conn.close()
         return jsonify({"success": False, "message": "All 8 seats are already taken!"})
 
-    # Check if user already has a seat
-    existing = conn.execute("SELECT * FROM auction_seats WHERE user_id = ?", (session["user_id"],)).fetchone()
-    if existing:
+    cur.execute("SELECT * FROM auction_seats WHERE user_id = %s", (session["user_id"],))
+    if cur.fetchone():
+        cur.close()
         conn.close()
         return jsonify({"success": False, "message": "You already claimed a team!"})
 
-    # Check if team already taken
-    team_taken = conn.execute("SELECT * FROM auction_seats WHERE team_id = ?", (team_id,)).fetchone()
-    if team_taken:
+    cur.execute("SELECT * FROM auction_seats WHERE team_id = %s", (team_id,))
+    if cur.fetchone():
+        cur.close()
         conn.close()
-        return jsonify({"success": False, "message": "This team is already claimed by another user!"})
+        return jsonify({"success": False, "message": "This team is already claimed!"})
 
-    conn.execute("""
-        INSERT INTO auction_seats (user_id, team_id, username) VALUES (?, ?, ?)
-    """, (session["user_id"], team_id, session["username"]))
+    cur.execute("INSERT INTO auction_seats (user_id, team_id, username) VALUES (%s, %s, %s)",
+                (session["user_id"], team_id, session["username"]))
     conn.commit()
+    cur.close()
     conn.close()
-
     return jsonify({"success": True, "message": "Team claimed successfully!"})
 
 
-# ---------------- RELEASE SEAT (leave room) ----------------
 @live_bp.route("/api/live/leave-seat", methods=["POST"])
 @login_required
 def leave_seat():
     conn = get_db_connection()
-    conn.execute("DELETE FROM auction_seats WHERE user_id = ?", (session["user_id"],))
+    cur = get_cursor(conn)
+    cur.execute("DELETE FROM auction_seats WHERE user_id = %s", (session["user_id"],))
     conn.commit()
+    cur.close()
     conn.close()
     return jsonify({"success": True})
 
 
-# ---------------- START LIVE AUCTION (pick first player) ----------------
 @live_bp.route("/api/live/start", methods=["POST"])
 @login_required
 def start_live_auction():
     conn = get_db_connection()
+    cur = get_cursor(conn)
 
-    seats_taken = conn.execute("SELECT COUNT(*) FROM auction_seats").fetchone()[0]
-    if seats_taken < 1:
+    cur.execute("SELECT COUNT(*) as c FROM auction_seats")
+    if cur.fetchone()["c"] < 1:
+        cur.close()
         conn.close()
-        return jsonify({"success": False, "message": "At least 1 seat must be claimed to start!"})
+        return jsonify({"success": False, "message": "At least 1 seat must be claimed!"})
 
-    room = conn.execute("SELECT * FROM auction_room ORDER BY id DESC LIMIT 1").fetchone()
+    cur.execute("SELECT * FROM auction_room ORDER BY id DESC LIMIT 1")
+    room = cur.fetchone()
 
     if room["status"] == "live":
+        cur.close()
         conn.close()
         return jsonify({"success": False, "message": "Auction already live!"})
 
-    # Pick a random unsold player
-    player = conn.execute("SELECT * FROM players WHERE is_sold = 0 ORDER BY RANDOM() LIMIT 1").fetchone()
+    cur.execute("SELECT * FROM players WHERE is_sold = 0 ORDER BY RANDOM() LIMIT 1")
+    player = cur.fetchone()
 
     if not player:
+        cur.close()
         conn.close()
-        return jsonify({"success": False, "message": "No players left to auction!"})
+        return jsonify({"success": False, "message": "No players left!"})
 
     timer_end = time.time() + BID_TIMER_SECONDS
-
-    conn.execute("""
-        UPDATE auction_room SET current_player_id=?, current_bid=?, current_bid_team_id=NULL,
-        timer_end=?, status='live' WHERE id=?
+    cur.execute("""
+        UPDATE auction_room SET current_player_id=%s, current_bid=%s,
+        current_bid_team_id=NULL, timer_end=%s, status='live' WHERE id=%s
     """, (player["id"], player["base_price"], timer_end, room["id"]))
 
     conn.commit()
+    cur.close()
     conn.close()
     return jsonify({"success": True, "message": "Live auction started!"})
 
 
-# ---------------- GET CURRENT AUCTION STATE (polled every 1s by frontend) ----------------
 @live_bp.route("/api/live/state")
 @login_required
 def live_state():
     conn = get_db_connection()
-    room = conn.execute("SELECT * FROM auction_room ORDER BY id DESC LIMIT 1").fetchone()
+    cur = get_cursor(conn)
+
+    cur.execute("SELECT * FROM auction_room ORDER BY id DESC LIMIT 1")
+    room = cur.fetchone()
 
     response = {
         "status": room["status"],
@@ -139,42 +149,45 @@ def live_state():
     }
 
     if room["current_player_id"]:
-        player = conn.execute("SELECT * FROM players WHERE id = ?", (room["current_player_id"],)).fetchone()
-        response["player"] = {
-            "id": player["id"],
-            "name": player["name"],
-            "role": player["role"],
-            "rating": player["rating"],
-            "batting": player["batting"],
-            "bowling": player["bowling"],
-            "fielding": player["fielding"],
-            "base_price": player["base_price"],
-            "image": player["image"]
-        }
+        cur.execute("SELECT * FROM players WHERE id = %s", (room["current_player_id"],))
+        player = cur.fetchone()
+        if player:
+            response["player"] = {
+                "id": player["id"],
+                "name": player["name"],
+                "role": player["role"],
+                "rating": player["rating"],
+                "batting": player["batting"],
+                "bowling": player["bowling"],
+                "fielding": player["fielding"],
+                "base_price": player["base_price"],
+                "image": player["image"]
+            }
 
     if room["current_bid_team_id"]:
-        bidding_team = conn.execute("SELECT * FROM teams WHERE id = ?", (room["current_bid_team_id"],)).fetchone()
+        cur.execute("SELECT * FROM teams WHERE id = %s", (room["current_bid_team_id"],))
+        bidding_team = cur.fetchone()
         response["current_bid_team"] = bidding_team["name"]
         response["current_bid_team_id"] = bidding_team["id"]
     else:
         response["current_bid_team"] = None
         response["current_bid_team_id"] = None
 
-    # Get all teams with budgets for sidebar
-    teams = conn.execute("""
+    cur.execute("""
         SELECT auction_seats.team_id, auction_seats.username, teams.name, teams.budget
         FROM auction_seats JOIN teams ON auction_seats.team_id = teams.id
-    """).fetchall()
+    """)
+    teams = cur.fetchall()
     response["teams"] = [dict(t) for t in teams]
 
-    # Remaining players count
-    response["remaining"] = conn.execute("SELECT COUNT(*) FROM players WHERE is_sold = 0").fetchone()[0]
+    cur.execute("SELECT COUNT(*) as c FROM players WHERE is_sold = 0")
+    response["remaining"] = cur.fetchone()["c"]
 
+    cur.close()
     conn.close()
     return jsonify(response)
 
 
-# ---------------- PLACE A BID (only seat holders) ----------------
 @live_bp.route("/api/live/bid", methods=["POST"])
 @login_required
 def place_bid():
@@ -182,70 +195,69 @@ def place_bid():
     bid_amount = float(data.get("bid_amount"))
 
     conn = get_db_connection()
+    cur = get_cursor(conn)
 
-    # Verify user has a seat (team)
-    seat = conn.execute("SELECT * FROM auction_seats WHERE user_id = ?", (session["user_id"],)).fetchone()
+    cur.execute("SELECT * FROM auction_seats WHERE user_id = %s", (session["user_id"],))
+    seat = cur.fetchone()
+
     if not seat:
+        cur.close()
         conn.close()
         return jsonify({"success": False, "message": "You don't have a team seat!"})
 
-    room = conn.execute("SELECT * FROM auction_room ORDER BY id DESC LIMIT 1").fetchone()
+    cur.execute("SELECT * FROM auction_room ORDER BY id DESC LIMIT 1")
+    room = cur.fetchone()
 
     if room["status"] != "live":
+        cur.close()
         conn.close()
         return jsonify({"success": False, "message": "No live auction in progress!"})
 
-    # Check timer hasn't expired (small grace allowed via background check, but validate here too)
     if time.time() > room["timer_end"]:
+        cur.close()
         conn.close()
-        return jsonify({"success": False, "message": "Time's up! Bidding closed for this player."})
+        return jsonify({"success": False, "message": "Time's up!"})
 
-    # Bid must be higher than current bid
     if bid_amount <= room["current_bid"]:
+        cur.close()
         conn.close()
-        return jsonify({"success": False, "message": f"Bid must be higher than current bid (₹{room['current_bid']} Cr)"})
+        return jsonify({"success": False, "message": f"Bid must be higher than ₹{room['current_bid']} Cr"})
 
-    # Check team can't bid on itself again consecutively (optional - allow re-raise by others only is common,
-    # but we'll allow same team to NOT bid against itself)
     if room["current_bid_team_id"] == seat["team_id"]:
+        cur.close()
         conn.close()
         return jsonify({"success": False, "message": "You are already the highest bidder!"})
 
-    # Check team budget
-    team = conn.execute("SELECT * FROM teams WHERE id = ?", (seat["team_id"],)).fetchone()
-    if bid_amount > team["budget"]:
-        conn.close()
-        return jsonify({"success": False, "message": "Insufficient budget for this bid!"})
+    cur.execute("SELECT * FROM teams WHERE id = %s", (seat["team_id"],))
+    team = cur.fetchone()
 
-    # Update bid + reset timer
+    if bid_amount > team["budget"]:
+        cur.close()
+        conn.close()
+        return jsonify({"success": False, "message": "Insufficient budget!"})
+
     new_timer_end = time.time() + BID_TIMER_SECONDS
-    conn.execute("""
-        UPDATE auction_room SET current_bid=?, current_bid_team_id=?, timer_end=? WHERE id=?
+    cur.execute("""
+        UPDATE auction_room SET current_bid=%s, current_bid_team_id=%s, timer_end=%s WHERE id=%s
     """, (bid_amount, seat["team_id"], new_timer_end, room["id"]))
 
     conn.commit()
+    cur.close()
     conn.close()
     return jsonify({"success": True, "message": "Bid placed!"})
 
 
-# ---------------- CHECK & FINALIZE TIMER (called by frontend polling) ----------------
 @live_bp.route("/api/live/check-timer", methods=["POST"])
 @login_required
 def check_timer():
-    """
-    If timer has expired:
-      - If there's a current bid -> sell the player to the highest bidder
-      - If no bid was placed -> mark player unsold
-    Then automatically picks the next random player.
-    """
     conn = get_db_connection()
-    room = conn.execute("SELECT * FROM auction_room ORDER BY id DESC LIMIT 1").fetchone()
+    cur = get_cursor(conn)
 
-    if room["status"] != "live":
-        conn.close()
-        return jsonify({"finalized": False})
+    cur.execute("SELECT * FROM auction_room ORDER BY id DESC LIMIT 1")
+    room = cur.fetchone()
 
-    if time.time() <= room["timer_end"]:
+    if room["status"] != "live" or time.time() <= room["timer_end"]:
+        cur.close()
         conn.close()
         return jsonify({"finalized": False})
 
@@ -253,62 +265,60 @@ def check_timer():
     result_message = ""
 
     if room["current_bid_team_id"]:
-        # SOLD to highest bidder
         sold_price = room["current_bid"]
         team_id = room["current_bid_team_id"]
 
-        conn.execute("""
-            UPDATE players SET is_sold=1, sold_price=?, team_id=? WHERE id=?
-        """, (sold_price, team_id, player_id))
+        cur.execute("UPDATE players SET is_sold=1, sold_price=%s, team_id=%s WHERE id=%s",
+                    (sold_price, team_id, player_id))
+        cur.execute("UPDATE teams SET budget=budget-%s WHERE id=%s", (sold_price, team_id))
 
-        conn.execute("UPDATE teams SET budget = budget - ? WHERE id = ?", (sold_price, team_id))
-
-        team = conn.execute("SELECT name FROM teams WHERE id = ?", (team_id,)).fetchone()
-        player = conn.execute("SELECT name FROM players WHERE id = ?", (player_id,)).fetchone()
+        cur.execute("SELECT name FROM teams WHERE id=%s", (team_id,))
+        team = cur.fetchone()
+        cur.execute("SELECT name FROM players WHERE id=%s", (player_id,))
+        player = cur.fetchone()
         result_message = f"{player['name']} SOLD to {team['name']} for ₹{sold_price} Cr!"
     else:
-        # UNSOLD - no bids
-        conn.execute("""
-            UPDATE players SET is_sold=1, sold_price=0, team_id=NULL WHERE id=?
-        """, (player_id,))
-        player = conn.execute("SELECT name FROM players WHERE id = ?", (player_id,)).fetchone()
-        result_message = f"{player['name']} went UNSOLD (no bids)."
+        cur.execute("UPDATE players SET is_sold=1, sold_price=0, team_id=NULL WHERE id=%s", (player_id,))
+        cur.execute("SELECT name FROM players WHERE id=%s", (player_id,))
+        player = cur.fetchone()
+        result_message = f"{player['name']} went UNSOLD."
 
     conn.commit()
 
-    # Pick next random unsold player
-    next_player = conn.execute("SELECT * FROM players WHERE is_sold = 0 ORDER BY RANDOM() LIMIT 1").fetchone()
+    cur.execute("SELECT * FROM players WHERE is_sold=0 ORDER BY RANDOM() LIMIT 1")
+    next_player = cur.fetchone()
 
     if next_player:
         new_timer_end = time.time() + BID_TIMER_SECONDS
-        conn.execute("""
-            UPDATE auction_room SET current_player_id=?, current_bid=?, current_bid_team_id=NULL,
-            timer_end=?, status='live' WHERE id=?
+        cur.execute("""
+            UPDATE auction_room SET current_player_id=%s, current_bid=%s,
+            current_bid_team_id=NULL, timer_end=%s, status='live' WHERE id=%s
         """, (next_player["id"], next_player["base_price"], new_timer_end, room["id"]))
     else:
-        # No more players - finish auction
-        conn.execute("""
+        cur.execute("""
             UPDATE auction_room SET status='finished', current_player_id=NULL,
-            current_bid=0, current_bid_team_id=NULL WHERE id=?
+            current_bid=0, current_bid_team_id=NULL WHERE id=%s
         """, (room["id"],))
         result_message += " 🎉 AUCTION COMPLETED!"
 
     conn.commit()
+    cur.close()
     conn.close()
 
     return jsonify({"finalized": True, "message": result_message})
 
 
-# ---------------- RESET LIVE AUCTION ROOM (admin only) ----------------
 @live_bp.route("/api/live/reset-room", methods=["POST"])
 @admin_required
 def reset_live_room():
     conn = get_db_connection()
-    conn.execute("DELETE FROM auction_seats")
-    conn.execute("""
+    cur = get_cursor(conn)
+    cur.execute("DELETE FROM auction_seats")
+    cur.execute("""
         UPDATE auction_room SET current_player_id=NULL, current_bid=0,
         current_bid_team_id=NULL, timer_end=0, status='waiting'
     """)
     conn.commit()
+    cur.close()
     conn.close()
     return jsonify({"success": True, "message": "Live auction room reset!"})

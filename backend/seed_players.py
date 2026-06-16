@@ -1,21 +1,9 @@
-"""
-Script to generate 300 real cricket players with images.
-Run this ONCE after init_db() to populate the players table.
-
-Usage:
-    python seed_players.py
-"""
-
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import random
 import os
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "database.db")
-
-# ---------------- REAL PLAYER POOL ----------------
-# Real cricketer names with role assigned.
-# Images use Wikipedia/ESPNcricinfo style placeholder avatars via randomuser/ui-avatars
-# (Using ui-avatars.com to generate consistent avatar images with player initials - works without API key)
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 REAL_PLAYERS = [
     ("Virat Kohli", "Batsman"), ("Rohit Sharma", "Batsman"), ("MS Dhoni", "Wicketkeeper"),
@@ -67,137 +55,117 @@ REAL_PLAYERS = [
     ("Heinrich Klaasen", "Wicketkeeper"), ("Tabraiz Shamsi", "Bowler"), ("Lungi Ngidi", "Bowler"),
     ("Reeza Hendricks", "Batsman"), ("Tristan Stubbs", "Batsman"), ("Marco Jansen", "All-rounder"),
     ("Gerald Coetzee", "Bowler"), ("Wiaan Mulder", "All-rounder"), ("Keshav Maharaj", "Bowler"),
-    ("Mark Boucher", "Wicketkeeper"), ("Jacques Kallis", "All-rounder"), ("Graeme Smith", "Batsman"),
+    ("Jacques Kallis", "All-rounder"), ("Graeme Smith", "Batsman"),
     ("Shane Watson", "All-rounder"), ("Brett Lee", "Bowler"), ("Ricky Ponting", "Batsman"),
     ("Michael Clarke", "Batsman"), ("Adam Gilchrist", "Wicketkeeper"), ("Brad Haddin", "Wicketkeeper"),
-    ("Shaun Marsh", "Batsman"), ("Aaron Finch", "Batsman"), ("James Pattinson", "Bowler"),
-    ("Nathan Lyon", "Bowler"), ("Marcus Harris", "Batsman"), ("Usman Khawaja", "Batsman"),
-    ("Will Pucovski", "Batsman"), ("Cameron Bancroft", "Batsman"), ("Josh Inglis", "Wicketkeeper"),
-    ("Matthew Renshaw", "Batsman"), ("Spencer Johnson", "Bowler"), ("Jhye Richardson", "Bowler"),
-    ("Sean Abbott", "Bowler"), ("Daniel Sams", "All-rounder"), ("Ben Dwarshuis", "Bowler"),
-    ("Riley Meredith", "Bowler"), ("Ashton Agar", "All-rounder"), ("Matthew Kuhnemann", "Bowler"),
-    ("Todd Murphy", "Bowler"), ("Cooper Connolly", "All-rounder"), ("Jake Fraser-McGurk", "Batsman"),
-    ("Tanveer Sangha", "Bowler"), ("Aaron Hardie", "All-rounder"), ("Lance Morris", "Bowler"),
+    ("Aaron Finch", "Batsman"), ("Nathan Lyon", "Bowler"), ("Usman Khawaja", "Batsman"),
+    ("Spencer Johnson", "Bowler"), ("Jhye Richardson", "Bowler"), ("Sean Abbott", "Bowler"),
+    ("Daniel Sams", "All-rounder"), ("Riley Meredith", "Bowler"), ("Ashton Agar", "All-rounder"),
+    ("Jake Fraser-McGurk", "Batsman"), ("Aaron Hardie", "All-rounder"), ("Lance Morris", "Bowler"),
     ("Nathan Ellis", "Bowler"), ("Will Sutherland", "All-rounder"), ("Ben McDermott", "Wicketkeeper"),
-    ("Matthew Short", "All-rounder"), ("Jake Weatherald", "Batsman"), ("Henry Hunt", "Batsman"),
-    ("Jack Edwards", "All-rounder"), ("Param Uppal", "Batsman"), ("Cameron Bancroft Jr", "Batsman"),
-    ("Sam Konstas", "Batsman"), ("Hilton Cartwright", "All-rounder"), ("Liam Hatcher", "Bowler"),
+    ("Matthew Short", "All-rounder"), ("Sam Konstas", "Batsman"), ("Hilton Cartwright", "All-rounder"),
     ("Ben Sears", "Bowler"), ("Will Young", "Batsman"), ("Tom Latham", "Wicketkeeper"),
     ("Henry Nicholls", "Batsman"), ("Rachin Ravindra", "All-rounder"), ("Matt Henry", "Bowler"),
-    ("Adam Milne", "Bowler"), ("Ben Lister", "Bowler"), ("Kyle Jamieson", "Bowler"),
-    ("Michael Bracewell", "All-rounder"), ("Tom Bruce", "All-rounder"), ("Mark Chapman", "Batsman"),
-    ("George Munsey", "Batsman"), ("Richie Berrington", "All-rounder"), ("Brad Wheal", "Bowler"),
-    ("Chris Sole", "Bowler"), ("Mark Watt", "Bowler"), ("Calum MacLeod", "Batsman"),
-    ("Mohammad Hafeez", "All-rounder"), ("Shoaib Malik", "All-rounder"), ("Sarfaraz Ahmed", "Wicketkeeper"),
-    ("Hasan Ali", "Bowler"), ("Wahab Riaz", "Bowler"), ("Mohammad Amir", "Bowler"),
-    ("Asif Ali", "Batsman"), ("Khushdil Shah", "All-rounder"), ("Saud Shakeel", "Batsman"),
-    ("Abdullah Shafique", "Batsman"), ("Mohammad Wasim Jr", "Bowler"), ("Zaman Khan", "Bowler"),
-    ("Abrar Ahmed", "Bowler"), ("Usama Mir", "Bowler"), ("Salman Agha", "All-rounder"),
-    ("Mohammad Haris", "Wicketkeeper"), ("Azam Khan", "Wicketkeeper"), ("Tayyab Tahir", "Batsman"),
-    ("Faheem Ashraf", "All-rounder"), ("Saim Ayub", "Batsman"), ("Sahibzada Farhan", "Batsman"),
-    ("Akif Javed", "Bowler"), ("Mohammad Ali", "Bowler"), ("Aamer Jamal", "All-rounder"),
-    ("Imran Tahir", "Bowler"), ("Albie Morkel", "All-rounder"), ("Morne Morkel", "Bowler"),
-    ("Dale Steyn", "Bowler"), ("Hashim Amla", "Batsman"), ("JP Duminy", "All-rounder"),
-    ("Colin Ingram", "Batsman"), ("Robin Peterson", "Bowler"), ("Vernon Philander", "Bowler"),
-    ("Wayne Parnell", "Bowler"), ("Lonwabo Tsotsobe", "Bowler"), ("Farhaan Behardien", "All-rounder"),
+    ("Adam Milne", "Bowler"), ("Kyle Jamieson", "Bowler"), ("Michael Bracewell", "All-rounder"),
+    ("Mark Chapman", "Batsman"), ("Mohammad Hafeez", "All-rounder"), ("Shoaib Malik", "All-rounder"),
+    ("Sarfaraz Ahmed", "Wicketkeeper"), ("Hasan Ali", "Bowler"), ("Wahab Riaz", "Bowler"),
+    ("Mohammad Amir", "Bowler"), ("Khushdil Shah", "All-rounder"), ("Saud Shakeel", "Batsman"),
+    ("Abdullah Shafique", "Batsman"), ("Zaman Khan", "Bowler"), ("Abrar Ahmed", "Bowler"),
+    ("Usama Mir", "Bowler"), ("Salman Agha", "All-rounder"), ("Mohammad Haris", "Wicketkeeper"),
+    ("Saim Ayub", "Batsman"), ("Faheem Ashraf", "All-rounder"), ("Aamer Jamal", "All-rounder"),
+    ("Imran Tahir", "Bowler"), ("Dale Steyn", "Bowler"), ("Hashim Amla", "Batsman"),
+    ("JP Duminy", "All-rounder"), ("Colin Ingram", "Batsman"), ("Wayne Parnell", "Bowler"),
     ("Rilee Rossouw", "Batsman"), ("Andile Phehlukwayo", "All-rounder"), ("Lutho Sipamla", "Bowler"),
-    ("Sisanda Magala", "Bowler"), ("Donovan Ferreira", "Wicketkeeper"), ("Dewald Brevis", "Batsman"),
-    ("Ryan Rickelton", "Wicketkeeper"), ("Matthew Breetzke", "Batsman"), ("Corbin Bosch", "All-rounder"),
-    ("Nandre Burger", "Bowler"), ("Ottneil Baartman", "Bowler"), ("George Linde", "All-rounder"),
-    ("Bjorn Fortuin", "Bowler"), ("Senuran Muthusamy", "All-rounder"), ("Kyle Verreynne", "Wicketkeeper"),
-    ("Khaya Zondo", "Batsman"), ("Theunis de Bruyn", "Batsman"), ("Zubayr Hamza", "Batsman"),
-    ("Pite van Biljon", "Wicketkeeper"), ("Janneman Malan", "Batsman"), ("Jon-Jon Smuts", "All-rounder"),
-    ("Eathan Bosch", "Bowler"), ("Beuran Hendricks", "Bowler"), ("David Wiese", "All-rounder"),
-    ("Kyle Abbott", "Bowler"), ("Imran Khan Sr", "Bowler"), ("Wasim Akram", "Bowler"),
-    ("Waqar Younis", "Bowler"), ("Inzamam-ul-Haq", "Batsman"), ("Saeed Anwar", "Batsman"),
-    ("Younis Khan", "Batsman"), ("Misbah-ul-Haq", "Batsman"), ("Shahid Afridi", "All-rounder"),
-    ("Brian Lara", "Batsman"), ("Curtly Ambrose", "Bowler"), ("Courtney Walsh", "Bowler"),
-    ("Viv Richards", "Batsman"), ("Carl Hooper", "All-rounder"), ("Ramnaresh Sarwan", "Batsman"),
+    ("Dewald Brevis", "Batsman"), ("Ryan Rickelton", "Wicketkeeper"), ("Corbin Bosch", "All-rounder"),
+    ("Nandre Burger", "Bowler"), ("George Linde", "All-rounder"), ("Kyle Verreynne", "Wicketkeeper"),
+    ("Khaya Zondo", "Batsman"), ("Theunis de Bruyn", "Batsman"), ("Janneman Malan", "Batsman"),
+    ("Wasim Akram", "Bowler"), ("Waqar Younis", "Bowler"), ("Inzamam-ul-Haq", "Batsman"),
+    ("Saeed Anwar", "Batsman"), ("Younis Khan", "Batsman"), ("Misbah-ul-Haq", "Batsman"),
+    ("Shahid Afridi", "All-rounder"), ("Brian Lara", "Batsman"), ("Curtly Ambrose", "Bowler"),
+    ("Courtney Walsh", "Bowler"), ("Viv Richards", "Batsman"), ("Carl Hooper", "All-rounder"),
     ("Chris Jordan", "Bowler"), ("Tymal Mills", "Bowler"), ("David Willey", "All-rounder"),
-    ("Saqib Mahmood", "Bowler"), ("Olly Stone", "Bowler"), ("Will Jacks", "All-rounder"),
-    ("Rehan Ahmed", "Bowler"), ("Jacob Bethell", "All-rounder"), ("Jamie Smith", "Wicketkeeper"),
-    ("Dan Lawrence", "Batsman"), ("Jordan Cox", "Wicketkeeper"), ("Tom Banton", "Wicketkeeper"),
-    ("Alex Hales", "Batsman"), ("Jason Roy", "Batsman"), ("James Vince", "Batsman"),
+    ("Saqib Mahmood", "Bowler"), ("Will Jacks", "All-rounder"), ("Rehan Ahmed", "Bowler"),
+    ("Jacob Bethell", "All-rounder"), ("Jamie Smith", "Wicketkeeper"), ("Dan Lawrence", "Batsman"),
+    ("Jordan Cox", "Wicketkeeper"), ("Alex Hales", "Batsman"), ("Jason Roy", "Batsman"),
     ("Brydon Carse", "Bowler"), ("Gus Atkinson", "Bowler"), ("Josh Tongue", "Bowler"),
-    ("Sonny Baker", "Bowler"), ("Luke Wood", "Bowler"), ("John Turner", "Bowler"),
     ("Liam Dawson", "All-rounder"), ("Lewis Gregory", "All-rounder"), ("Craig Overton", "All-rounder"),
     ("Tom Curran", "All-rounder"), ("Ollie Pope", "Batsman"), ("Zak Crawley", "Batsman"),
-    ("Ben Duckett", "Batsman"), ("Dawid Malan", "Batsman")
+    ("Ben Duckett", "Batsman"), ("Dawid Malan", "Batsman"), ("James Vince", "Batsman"),
+    ("Tom Banton", "Wicketkeeper"), ("Luke Wood", "Bowler"), ("Olly Stone", "Bowler"),
+    ("Jos Hazlewood Jr", "Bowler"), ("Pat Rowe", "Batsman"), ("Sam Northeast", "Batsman"),
+    ("Chris Benjamin", "Wicketkeeper"), ("Michael Pepper", "Wicketkeeper"), ("Ed Barnard", "All-rounder"),
+    ("Ryan Higgins", "All-rounder"), ("Tom Abell", "Batsman"), ("George Garton", "Bowler"),
+    ("Danny Briggs", "Bowler"), ("James Fuller", "Bowler"), ("Leus du Plooy", "Batsman"),
+    ("Wayne Madsen", "Batsman"), ("Billy Godleman", "Batsman"), ("Matt Critchley", "All-rounder"),
+    ("Anuj Dal", "All-rounder"), ("Alex Hughes", "All-rounder"), ("Ravi Bopara", "All-rounder"),
+    ("Sir Alastair Cook", "Batsman"), ("Kevin Pietersen", "Batsman"), ("Andrew Flintoff", "All-rounder"),
+    ("Graeme Swann", "Bowler"), ("Matthew Prior", "Wicketkeeper"), ("Paul Collingwood", "All-rounder"),
+    ("Steve Harmison", "Bowler"), ("Simon Jones", "Bowler"), ("Ashley Giles", "Bowler"),
+    ("Marcus Trescothick", "Batsman"), ("Nasser Hussain", "Batsman"), ("Mike Atherton", "Batsman"),
 ]
 
 ROLES_VALID = ["Batsman", "Bowler", "All-rounder", "Wicketkeeper"]
 
 
-def random_skill(role, base):
-    """Generate skill values based on role and base rating."""
-    variance = random.randint(-10, 10)
-    val = max(20, min(99, base + variance))
-    return val
+def random_skill(base):
+    val = base + random.randint(-10, 10)
+    return max(20, min(99, val))
 
 
 def generate_players():
-    """Insert 300 real players into the database with stats and images."""
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    # Clear existing players (fresh seed)
     cur.execute("DELETE FROM players")
-    cur.execute("UPDATE teams SET budget = 120, matches_played=0, wins=0, losses=0, points=0, nrr=0.0")
+    cur.execute("UPDATE teams SET budget=120, matches_played=0, wins=0, losses=0, points=0, nrr=0.0")
 
     players_list = REAL_PLAYERS.copy()
-
-    # If less than 300, repeat with suffixes to reach exactly 300
     idx = 1
     while len(players_list) < 300:
         base_name, base_role = REAL_PLAYERS[idx % len(REAL_PLAYERS)]
         players_list.append((f"{base_name} Jr {idx}", base_role))
         idx += 1
-
     players_list = players_list[:300]
 
     for name, role in players_list:
         if role not in ROLES_VALID:
             role = "All-rounder"
 
-        # Overall rating between 50-99
         rating = random.randint(50, 99)
 
-        # Skill values based on role
         if role == "Batsman":
-            batting = random_skill(role, rating)
+            batting = random_skill(rating)
             bowling = random.randint(20, 50)
-            fielding = random_skill(role, rating - 5)
+            fielding = random_skill(rating - 5)
         elif role == "Bowler":
-            bowling = random_skill(role, rating)
+            bowling = random_skill(rating)
             batting = random.randint(20, 50)
-            fielding = random_skill(role, rating - 5)
+            fielding = random_skill(rating - 5)
         elif role == "Wicketkeeper":
-            batting = random_skill(role, rating)
+            batting = random_skill(rating)
             bowling = random.randint(15, 35)
-            fielding = random_skill(role, rating + 2)
-        else:  # All-rounder
-            batting = random_skill(role, rating - 5)
-            bowling = random_skill(role, rating - 5)
-            fielding = random_skill(role, rating - 8)
+            fielding = random_skill(rating + 2)
+        else:
+            batting = random_skill(rating - 5)
+            bowling = random_skill(rating - 5)
+            fielding = random_skill(rating - 8)
 
         batting = min(99, max(20, batting))
         bowling = min(99, max(15, bowling))
         fielding = min(99, max(20, fielding))
 
-        base_price = 2.0  # 2 Crore base price for all
-
-        # Generate avatar image using ui-avatars (name initials, no API key required)
         initials = "".join([w[0] for w in name.split()[:2]])
         image_url = f"https://ui-avatars.com/api/?name={initials}&background=random&size=256&bold=true"
 
         cur.execute("""
             INSERT INTO players (name, role, rating, batting, bowling, fielding, base_price, image, team_id, is_sold, sold_price)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0)
-        """, (name, role, rating, batting, bowling, fielding, base_price, image_url))
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NULL, 0, 0)
+        """, (name, role, rating, batting, bowling, fielding, 2.0, image_url))
 
     conn.commit()
+    cur.close()
     conn.close()
-    print(f"✅ Successfully inserted {len(players_list)} players into database.")
+    print(f"✅ Successfully inserted {len(players_list)} players into PostgreSQL database.")
 
 
 if __name__ == "__main__":

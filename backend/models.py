@@ -1,38 +1,44 @@
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import os
 
-# Path to database file (in backend folder)
-DB_PATH = os.path.join(os.path.dirname(__file__), "database.db")
+# Get database URL from environment variable (set on Render)
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 
 def get_db_connection():
-    """Create and return a database connection."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # allows access by column name
+    """Create and return a PostgreSQL database connection."""
+    conn = psycopg2.connect(DATABASE_URL)
+    conn.autocommit = False
     return conn
+
+
+def get_cursor(conn):
+    """Return a dictionary cursor (access columns by name)."""
+    return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
 
 def init_db():
     """Create all required tables if they don't exist."""
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = get_cursor(conn)
 
-    # ---------- USERS TABLE (Admin + Normal Users) ----------
+    # ---------- USERS TABLE ----------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-            role TEXT NOT NULL DEFAULT 'user'   -- 'admin' or 'user'
+            role TEXT NOT NULL DEFAULT 'user'
         )
     """)
 
     # ---------- TEAMS TABLE ----------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS teams (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT UNIQUE NOT NULL,
-            budget REAL NOT NULL DEFAULT 120,   -- in Crore
+            budget REAL NOT NULL DEFAULT 120,
             matches_played INTEGER DEFAULT 0,
             wins INTEGER DEFAULT 0,
             losses INTEGER DEFAULT 0,
@@ -44,17 +50,17 @@ def init_db():
     # ---------- PLAYERS TABLE ----------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS players (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
-            role TEXT NOT NULL,         -- Batsman, Bowler, All-rounder, Wicketkeeper
-            rating INTEGER NOT NULL,    -- 1-100
+            role TEXT NOT NULL,
+            rating INTEGER NOT NULL,
             batting INTEGER NOT NULL,
             bowling INTEGER NOT NULL,
             fielding INTEGER NOT NULL,
             base_price REAL NOT NULL DEFAULT 2,
             sold_price REAL DEFAULT 0,
             image TEXT,
-            team_id INTEGER,            -- NULL if unsold
+            team_id INTEGER,
             is_sold INTEGER DEFAULT 0,
             FOREIGN KEY (team_id) REFERENCES teams(id)
         )
@@ -63,13 +69,13 @@ def init_db():
     # ---------- MATCHES TABLE ----------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS matches (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             team1_id INTEGER NOT NULL,
             team2_id INTEGER NOT NULL,
             team1_score INTEGER,
             team2_score INTEGER,
             winner_id INTEGER,
-            stage TEXT DEFAULT 'league',   -- league, semifinal, final
+            stage TEXT DEFAULT 'league',
             played INTEGER DEFAULT 0,
             FOREIGN KEY (team1_id) REFERENCES teams(id),
             FOREIGN KEY (team2_id) REFERENCES teams(id),
@@ -77,41 +83,39 @@ def init_db():
         )
     """)
 
-    conn.commit()
-
-    # ---------- BALL BY BALL TABLE (20 overs x 6 balls scorecard) ----------
+    # ---------- BALL BY BALL TABLE ----------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS ball_by_ball (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             match_id INTEGER NOT NULL,
-            innings INTEGER NOT NULL,        -- 1 or 2
-            over_number INTEGER NOT NULL,    -- 1 to 20
-            ball_number INTEGER NOT NULL,    -- 1 to 6
-            runs INTEGER NOT NULL DEFAULT 0, -- runs scored on this ball (0-6)
-            is_wicket INTEGER DEFAULT 0,     -- 1 if wicket fell on this ball
-            extra TEXT DEFAULT '',           -- 'wide', 'no ball', 'bye', or ''
+            innings INTEGER NOT NULL,
+            over_number INTEGER NOT NULL,
+            ball_number INTEGER NOT NULL,
+            runs INTEGER NOT NULL DEFAULT 0,
+            is_wicket INTEGER DEFAULT 0,
+            extra TEXT DEFAULT '',
             FOREIGN KEY (match_id) REFERENCES matches(id)
         )
     """)
 
-    # ---------- AUCTION ROOM TABLE (Live multiplayer auction state) ----------
+    # ---------- AUCTION ROOM TABLE ----------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS auction_room (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             current_player_id INTEGER,
             current_bid REAL DEFAULT 0,
             current_bid_team_id INTEGER,
-            timer_end REAL DEFAULT 0,       -- unix timestamp when timer expires
-            status TEXT DEFAULT 'waiting',  -- waiting, live, sold, unsold, finished
+            timer_end REAL DEFAULT 0,
+            status TEXT DEFAULT 'waiting',
             FOREIGN KEY (current_player_id) REFERENCES players(id),
             FOREIGN KEY (current_bid_team_id) REFERENCES teams(id)
         )
     """)
 
-    # ---------- AUCTION SEATS TABLE (First 8 users claim teams) ----------
+    # ---------- AUCTION SEATS TABLE ----------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS auction_seats (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             user_id INTEGER UNIQUE NOT NULL,
             team_id INTEGER UNIQUE NOT NULL,
             username TEXT NOT NULL,
@@ -120,29 +124,32 @@ def init_db():
         )
     """)
 
+    conn.commit()
+
     # ---------- INSERT DEFAULT TEAMS ----------
     team_names = [
         "Troopers A", "Troopers B", "Warriors A", "Warriors B",
         "Crusaders A", "Crusaders B", "Sentinels A", "Sentinels B"
     ]
     for name in team_names:
-        cur.execute("SELECT id FROM teams WHERE name = ?", (name,))
+        cur.execute("SELECT id FROM teams WHERE name = %s", (name,))
         if not cur.fetchone():
-            cur.execute("INSERT INTO teams (name, budget) VALUES (?, ?)", (name, 120))
+            cur.execute("INSERT INTO teams (name, budget) VALUES (%s, %s)", (name, 120))
 
     # ---------- INSERT DEFAULT ADMIN ----------
     from werkzeug.security import generate_password_hash
-    cur.execute("SELECT id FROM users WHERE username = ?", ("admin",))
+    cur.execute("SELECT id FROM users WHERE username = %s", ("admin",))
     if not cur.fetchone():
         cur.execute(
-            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+            "INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
             ("admin", generate_password_hash("admin123"), "admin")
         )
 
-        # Ensure one auction_room row exists
+    # ---------- ENSURE ONE AUCTION ROOM ROW ----------
     cur.execute("SELECT id FROM auction_room")
     if not cur.fetchone():
         cur.execute("INSERT INTO auction_room (status) VALUES ('waiting')")
 
     conn.commit()
+    cur.close()
     conn.close()

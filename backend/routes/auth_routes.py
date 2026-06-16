@@ -1,11 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
+from flask import Blueprint, render_template, request, redirect, url_for, sessifrom flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import get_db_connection
+from models import get_db_connection, get_cursor
 
 auth_bp = Blueprint("auth", __name__)
 
 
-# ---------------- LOGIN ----------------
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -13,15 +12,16 @@ def login():
         password = request.form["password"]
 
         conn = get_db_connection()
-        user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        cur = get_cursor(conn)
+        cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+        user = cur.fetchone()
+        cur.close()
         conn.close()
 
         if user and check_password_hash(user["password"], password):
-            # Save user info in session
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             session["role"] = user["role"]
-
             if user["role"] == "admin":
                 return redirect(url_for("admin.admin_panel"))
             else:
@@ -32,7 +32,6 @@ def login():
     return render_template("login.html")
 
 
-# ---------------- REGISTER (Normal Users only) ----------------
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -45,18 +44,21 @@ def register():
             return render_template("register.html")
 
         conn = get_db_connection()
-        existing = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        cur = get_cursor(conn)
+        cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+        existing = cur.fetchone()
 
         if existing:
             flash("Username already exists!", "danger")
+            cur.close()
             conn.close()
             return render_template("register.html")
 
-        # All registrations create a 'user' role (not admin)
         hashed_pw = generate_password_hash(password)
-        conn.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                      (username, hashed_pw, "user"))
+        cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
+                    (username, hashed_pw, "user"))
         conn.commit()
+        cur.close()
         conn.close()
 
         flash("Registration successful! Please login.", "success")
@@ -65,7 +67,6 @@ def register():
     return render_template("register.html")
 
 
-# ---------------- LOGOUT ----------------
 @auth_bp.route("/logout")
 def logout():
     session.clear()
