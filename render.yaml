@@ -8,7 +8,9 @@ services:
     envVars:
       - key: SECRET_KEY
         generateValue: true
-      - key: DATABASE_URL
-        fromDatabase:
-          name: cricket-auction-db
-          property: connectionString
+      - key: DB_PATH
+        value: /data/auction.db
+    disk:
+      name: sqlite-data
+      mountPath: /data
+      sizeGB: 1

@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, sessifrom flask import Blueprint, render_template, request, redirect, url_for, session, flash
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import get_db_connection, get_cursor
 
@@ -13,7 +13,7 @@ def login():
 
         conn = get_db_connection()
         cur = get_cursor(conn)
-        cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+        cur.execute("SELECT * FROM users WHERE username = ?", (username,))
         user = cur.fetchone()
         cur.close()
         conn.close()
@@ -45,7 +45,7 @@ def register():
 
         conn = get_db_connection()
         cur = get_cursor(conn)
-        cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+        cur.execute("SELECT * FROM users WHERE username = ?", (username,))
         existing = cur.fetchone()
 
         if existing:
@@ -55,7 +55,7 @@ def register():
             return render_template("register.html")
 
         hashed_pw = generate_password_hash(password)
-        cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
+        cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
                     (username, hashed_pw, "user"))
         conn.commit()
         cur.close()

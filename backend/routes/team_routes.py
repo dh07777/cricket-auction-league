@@ -23,10 +23,10 @@ def team_detail(team_id):
     conn = get_db_connection()
     cur = get_cursor(conn)
 
-    cur.execute("SELECT * FROM teams WHERE id = %s", (team_id,))
+    cur.execute("SELECT * FROM teams WHERE id = ?", (team_id,))
     team = cur.fetchone()
 
-    cur.execute("SELECT * FROM players WHERE team_id = %s ORDER BY rating DESC", (team_id,))
+    cur.execute("SELECT * FROM players WHERE team_id = ? ORDER BY rating DESC", (team_id,))
     players = cur.fetchall()
 
     cur.close()

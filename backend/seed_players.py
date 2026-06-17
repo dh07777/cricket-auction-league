@@ -1,9 +1,8 @@
-import psycopg2
-import psycopg2.extras
+import sqlite3
 import random
 import os
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
+DB_PATH = os.environ.get("DB_PATH", "auction.db")
 
 REAL_PLAYERS = [
     ("Virat Kohli", "Batsman"), ("Rohit Sharma", "Batsman"), ("MS Dhoni", "Wicketkeeper"),
@@ -113,8 +112,9 @@ def random_skill(base):
 
 
 def generate_players():
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
 
     cur.execute("DELETE FROM players")
     cur.execute("UPDATE teams SET budget=120, matches_played=0, wins=0, losses=0, points=0, nrr=0.0")
@@ -159,13 +159,13 @@ def generate_players():
 
         cur.execute("""
             INSERT INTO players (name, role, rating, batting, bowling, fielding, base_price, image, team_id, is_sold, sold_price)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NULL, 0, 0)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0)
         """, (name, role, rating, batting, bowling, fielding, 2.0, image_url))
 
     conn.commit()
     cur.close()
     conn.close()
-    print(f"✅ Successfully inserted {len(players_list)} players into PostgreSQL database.")
+    print(f"✅ Successfully inserted {len(players_list)} players into SQLite database.")
 
 
 if __name__ == "__main__":

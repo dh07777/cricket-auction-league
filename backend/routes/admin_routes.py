@@ -108,10 +108,10 @@ def admin_players():
     params = []
 
     if search:
-        query += " AND players.name ILIKE %s"
+        query += " AND players.name LIKE ?"   # ILIKE → LIKE
         params.append(f"%{search}%")
     if role_filter:
-        query += " AND players.role = %s"
+        query += " AND players.role = ?"
         params.append(role_filter)
 
     query += " ORDER BY players.id"
@@ -141,7 +141,7 @@ def add_player():
     cur = get_cursor(conn)
     cur.execute("""
         INSERT INTO players (name, role, rating, batting, bowling, fielding, base_price, image, is_sold)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
     """, (name, role, rating, batting, bowling, fielding, base_price, image))
     conn.commit()
     cur.close()
@@ -168,8 +168,8 @@ def edit_player(player_id):
         image = request.form.get("image")
 
         cur.execute("""
-            UPDATE players SET name=%s, role=%s, rating=%s, batting=%s,
-            bowling=%s, fielding=%s, base_price=%s, image=%s WHERE id=%s
+            UPDATE players SET name=?, role=?, rating=?, batting=?,
+            bowling=?, fielding=?, base_price=?, image=? WHERE id=?
         """, (name, role, rating, batting, bowling, fielding, base_price, image, player_id))
         conn.commit()
         cur.close()
@@ -178,7 +178,7 @@ def edit_player(player_id):
         flash("Player updated successfully!", "success")
         return redirect(url_for("admin.admin_players"))
 
-    cur.execute("SELECT * FROM players WHERE id = %s", (player_id,))
+    cur.execute("SELECT * FROM players WHERE id = ?", (player_id,))
     player = cur.fetchone()
     cur.close()
     conn.close()
@@ -192,7 +192,7 @@ def edit_player(player_id):
 def delete_player(player_id):
     conn = get_db_connection()
     cur = get_cursor(conn)
-    cur.execute("DELETE FROM players WHERE id = %s", (player_id,))
+    cur.execute("DELETE FROM players WHERE id = ?", (player_id,))
     conn.commit()
     cur.close()
     conn.close()

@@ -74,7 +74,7 @@ def sell_player():
     conn = get_db_connection()
     cur = get_cursor(conn)
 
-    cur.execute("SELECT * FROM teams WHERE id = %s", (team_id,))
+    cur.execute("SELECT * FROM teams WHERE id = ?", (team_id,))
     team = cur.fetchone()
 
     if not team:
@@ -87,11 +87,9 @@ def sell_player():
         conn.close()
         return jsonify({"success": False, "message": "Insufficient team budget!"})
 
-    cur.execute("""
-        UPDATE players SET is_sold=1, sold_price=%s, team_id=%s WHERE id=%s
-    """, (sold_price, team_id, player_id))
-
-    cur.execute("UPDATE teams SET budget = budget - %s WHERE id = %s", (sold_price, team_id))
+    cur.execute("UPDATE players SET is_sold=1, sold_price=?, team_id=? WHERE id=?",
+                (sold_price, team_id, player_id))
+    cur.execute("UPDATE teams SET budget = budget - ? WHERE id = ?", (sold_price, team_id))
 
     conn.commit()
     cur.close()
@@ -107,7 +105,7 @@ def unsold_player():
 
     conn = get_db_connection()
     cur = get_cursor(conn)
-    cur.execute("UPDATE players SET is_sold=1, sold_price=0, team_id=NULL WHERE id=%s", (player_id,))
+    cur.execute("UPDATE players SET is_sold=1, sold_price=0, team_id=NULL WHERE id=?", (player_id,))
     conn.commit()
     cur.close()
     conn.close()
@@ -142,7 +140,7 @@ def auto_simulate_auction():
         eligible_team_ids = [tid for tid, budget in team_budgets.items() if budget >= base_price]
 
         if not eligible_team_ids or random.random() < 0.15:
-            cur.execute("UPDATE players SET is_sold=1, sold_price=0, team_id=NULL WHERE id=%s", (player["id"],))
+            cur.execute("UPDATE players SET is_sold=1, sold_price=0, team_id=NULL WHERE id=?", (player["id"],))
             unsold_count += 1
             continue
 
@@ -154,15 +152,13 @@ def auto_simulate_auction():
         sold_price = round(min(raw_price, winning_budget), 1)
         sold_price = max(base_price, min(sold_price, winning_budget))
 
-        cur.execute("""
-            UPDATE players SET is_sold=1, sold_price=%s, team_id=%s WHERE id=%s
-        """, (sold_price, winning_team_id, player["id"]))
-
+        cur.execute("UPDATE players SET is_sold=1, sold_price=?, team_id=? WHERE id=?",
+                    (sold_price, winning_team_id, player["id"]))
         team_budgets[winning_team_id] -= sold_price
         sold_count += 1
 
     for team_id, new_budget in team_budgets.items():
-        cur.execute("UPDATE teams SET budget=%s WHERE id=%s", (round(new_budget, 1), team_id))
+        cur.execute("UPDATE teams SET budget=? WHERE id=?", (round(new_budget, 1), team_id))
 
     conn.commit()
     cur.close()
@@ -188,7 +184,7 @@ def auction_summary():
     summary = []
     for team in teams:
         cur.execute("""
-            SELECT * FROM players WHERE team_id=%s AND is_sold=1 ORDER BY sold_price DESC
+            SELECT * FROM players WHERE team_id=? AND is_sold=1 ORDER BY sold_price DESC
         """, (team["id"],))
         players = cur.fetchall()
         total_spent = sum([p["sold_price"] for p in players]) if players else 0

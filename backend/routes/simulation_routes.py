@@ -7,7 +7,7 @@ sim_bp = Blueprint("sim", __name__)
 
 
 def get_team_strength(cur, team_id):
-    cur.execute("SELECT rating FROM players WHERE team_id = %s", (team_id,))
+    cur.execute("SELECT rating FROM players WHERE team_id = ?", (team_id,))
     players = cur.fetchall()
     if not players:
         return 50
@@ -35,7 +35,7 @@ def simulate_match(cur, team1_id, team2_id):
 
 
 def generate_ball_by_ball(conn, cur, match_id, team1_id, team2_id, score1, score2):
-    cur.execute("DELETE FROM ball_by_ball WHERE match_id = %s", (match_id,))
+    cur.execute("DELETE FROM ball_by_ball WHERE match_id = ?", (match_id,))
 
     for innings, (team_id, total_score) in enumerate([(team1_id, score1), (team2_id, score2)], start=1):
         strength = get_team_strength(cur, team_id)
@@ -70,7 +70,7 @@ def generate_ball_by_ball(conn, cur, match_id, team1_id, team2_id, score1, score
 
                 cur.execute("""
                     INSERT INTO ball_by_ball (match_id, innings, over_number, ball_number, runs, is_wicket, extra)
-                    VALUES (%s, %s, %s, %s, %s, %s, '')
+                    VALUES (?, ?, ?, ?, ?, ?, '')
                 """, (match_id, innings, over, ball, run, is_wicket))
 
     conn.commit()
@@ -90,7 +90,7 @@ def generate_league():
     for i in range(len(team_ids)):
         for j in range(i + 1, len(team_ids)):
             cur.execute("""
-                INSERT INTO matches (team1_id, team2_id, stage, played) VALUES (%s, %s, 'league', 0)
+                INSERT INTO matches (team1_id, team2_id, stage, played) VALUES (?, ?, 'league', 0)
             """, (team_ids[i], team_ids[j]))
 
     conn.commit()
@@ -118,15 +118,15 @@ def simulate_league():
         loser_id = match["team2_id"] if winner_id == match["team1_id"] else match["team1_id"]
 
         cur.execute("""
-            UPDATE matches SET team1_score=%s, team2_score=%s, winner_id=%s, played=1 WHERE id=%s
+            UPDATE matches SET team1_score=?, team2_score=?, winner_id=?, played=1 WHERE id=?
         """, (score1, score2, winner_id, match["id"]))
 
         cur.execute("""
-            UPDATE teams SET matches_played=matches_played+1, wins=wins+1, points=points+2 WHERE id=%s
+            UPDATE teams SET matches_played=matches_played+1, wins=wins+1, points=points+2 WHERE id=?
         """, (winner_id,))
 
         cur.execute("""
-            UPDATE teams SET matches_played=matches_played+1, losses=losses+1 WHERE id=%s
+            UPDATE teams SET matches_played=matches_played+1, losses=losses+1 WHERE id=?
         """, (loser_id,))
 
         conn.commit()
@@ -160,9 +160,9 @@ def generate_playoffs():
         conn.close()
         return jsonify({"success": False, "message": "Not enough teams!"})
 
-    cur.execute("INSERT INTO matches (team1_id, team2_id, stage, played) VALUES (%s, %s, 'semifinal', 0)",
+    cur.execute("INSERT INTO matches (team1_id, team2_id, stage, played) VALUES (?, ?, 'semifinal', 0)",
                 (top4[0]["id"], top4[3]["id"]))
-    cur.execute("INSERT INTO matches (team1_id, team2_id, stage, played) VALUES (%s, %s, 'semifinal', 0)",
+    cur.execute("INSERT INTO matches (team1_id, team2_id, stage, played) VALUES (?, ?, 'semifinal', 0)",
                 (top4[1]["id"], top4[2]["id"]))
 
     conn.commit()
@@ -184,7 +184,7 @@ def simulate_playoffs():
         for match in semis:
             score1, score2, winner_id = simulate_match(cur, match["team1_id"], match["team2_id"])
             cur.execute("""
-                UPDATE matches SET team1_score=%s, team2_score=%s, winner_id=%s, played=1 WHERE id=%s
+                UPDATE matches SET team1_score=?, team2_score=?, winner_id=?, played=1 WHERE id=?
             """, (score1, score2, winner_id, match["id"]))
             conn.commit()
             generate_ball_by_ball(conn, cur, match["id"], match["team1_id"], match["team2_id"], score1, score2)
@@ -197,7 +197,7 @@ def simulate_playoffs():
         existing_final = cur.fetchone()
 
         if not existing_final and len(winner_ids) == 2:
-            cur.execute("INSERT INTO matches (team1_id, team2_id, stage, played) VALUES (%s, %s, 'final', 0)",
+            cur.execute("INSERT INTO matches (team1_id, team2_id, stage, played) VALUES (?, ?, 'final', 0)",
                         (winner_ids[0], winner_ids[1]))
             conn.commit()
 
@@ -211,7 +211,7 @@ def simulate_playoffs():
     if final:
         score1, score2, winner_id = simulate_match(cur, final["team1_id"], final["team2_id"])
         cur.execute("""
-            UPDATE matches SET team1_score=%s, team2_score=%s, winner_id=%s, played=1 WHERE id=%s
+            UPDATE matches SET team1_score=?, team2_score=?, winner_id=?, played=1 WHERE id=?
         """, (score1, score2, winner_id, final["id"]))
         conn.commit()
         generate_ball_by_ball(conn, cur, final["id"], final["team1_id"], final["team2_id"], score1, score2)
@@ -275,7 +275,7 @@ def champion_page():
     champion_players = []
     if final:
         cur.execute("""
-            SELECT * FROM players WHERE team_id=%s ORDER BY rating DESC LIMIT 5
+            SELECT * FROM players WHERE team_id=? ORDER BY rating DESC LIMIT 5
         """, (final["winner_id"],))
         champion_players = cur.fetchall()
 
@@ -296,7 +296,7 @@ def match_scorecard(match_id):
         LEFT JOIN teams t1 ON matches.team1_id = t1.id
         LEFT JOIN teams t2 ON matches.team2_id = t2.id
         LEFT JOIN teams w ON matches.winner_id = w.id
-        WHERE matches.id = %s
+        WHERE matches.id = ?
     """, (match_id,))
     match = cur.fetchone()
 
@@ -306,10 +306,10 @@ def match_scorecard(match_id):
         flash("Match not found!", "danger")
         return redirect(url_for("team.matches"))
 
-    cur.execute("SELECT * FROM ball_by_ball WHERE match_id=%s AND innings=1 ORDER BY over_number, ball_number", (match_id,))
+    cur.execute("SELECT * FROM ball_by_ball WHERE match_id=? AND innings=1 ORDER BY over_number, ball_number", (match_id,))
     innings1 = cur.fetchall()
 
-    cur.execute("SELECT * FROM ball_by_ball WHERE match_id=%s AND innings=2 ORDER BY over_number, ball_number", (match_id,))
+    cur.execute("SELECT * FROM ball_by_ball WHERE match_id=? AND innings=2 ORDER BY over_number, ball_number", (match_id,))
     innings2 = cur.fetchall()
 
     def group_by_over(balls):
@@ -348,36 +348,36 @@ def update_ball():
     cur = get_cursor(conn)
 
     cur.execute("""
-        SELECT * FROM ball_by_ball WHERE match_id=%s AND innings=%s AND over_number=%s AND ball_number=%s
+        SELECT * FROM ball_by_ball WHERE match_id=? AND innings=? AND over_number=? AND ball_number=?
     """, (match_id, innings, over_number, ball_number))
     existing = cur.fetchone()
 
     if existing:
         cur.execute("""
-            UPDATE ball_by_ball SET runs=%s, is_wicket=%s
-            WHERE match_id=%s AND innings=%s AND over_number=%s AND ball_number=%s
+            UPDATE ball_by_ball SET runs=?, is_wicket=?
+            WHERE match_id=? AND innings=? AND over_number=? AND ball_number=?
         """, (runs, is_wicket, match_id, innings, over_number, ball_number))
     else:
         cur.execute("""
             INSERT INTO ball_by_ball (match_id, innings, over_number, ball_number, runs, is_wicket, extra)
-            VALUES (%s, %s, %s, %s, %s, %s, '')
+            VALUES (?, ?, ?, ?, ?, ?, '')
         """, (match_id, innings, over_number, ball_number, runs, is_wicket))
 
     conn.commit()
 
-    cur.execute("SELECT * FROM ball_by_ball WHERE match_id=%s AND innings=%s", (match_id, innings))
+    cur.execute("SELECT * FROM ball_by_ball WHERE match_id=? AND innings=?", (match_id, innings))
     balls = cur.fetchall()
     total_runs = sum([b["runs"] for b in balls])
     total_wickets = sum([b["is_wicket"] for b in balls])
 
-    cur.execute("SELECT * FROM matches WHERE id=%s", (match_id,))
+    cur.execute("SELECT * FROM matches WHERE id=?", (match_id,))
     match = cur.fetchone()
 
     if innings == 1:
-        cur.execute("UPDATE matches SET team1_score=%s WHERE id=%s", (total_runs, match_id))
+        cur.execute("UPDATE matches SET team1_score=? WHERE id=?", (total_runs, match_id))
         new_score1, new_score2 = total_runs, match["team2_score"]
     else:
-        cur.execute("UPDATE matches SET team2_score=%s WHERE id=%s", (total_runs, match_id))
+        cur.execute("UPDATE matches SET team2_score=? WHERE id=?", (total_runs, match_id))
         new_score1, new_score2 = match["team1_score"], total_runs
 
     if new_score1 is not None and new_score2 is not None:
@@ -388,12 +388,12 @@ def update_ball():
             old_loser = match["team2_id"] if old_winner == match["team1_id"] else match["team1_id"]
             new_loser = match["team2_id"] if new_winner == match["team1_id"] else match["team1_id"]
 
-            cur.execute("UPDATE teams SET wins=wins-1, points=points-2 WHERE id=%s", (old_winner,))
-            cur.execute("UPDATE teams SET losses=losses-1 WHERE id=%s", (old_loser,))
-            cur.execute("UPDATE teams SET wins=wins+1, points=points+2 WHERE id=%s", (new_winner,))
-            cur.execute("UPDATE teams SET losses=losses+1 WHERE id=%s", (new_loser,))
+            cur.execute("UPDATE teams SET wins=wins-1, points=points-2 WHERE id=?", (old_winner,))
+            cur.execute("UPDATE teams SET losses=losses-1 WHERE id=?", (old_loser,))
+            cur.execute("UPDATE teams SET wins=wins+1, points=points+2 WHERE id=?", (new_winner,))
+            cur.execute("UPDATE teams SET losses=losses+1 WHERE id=?", (new_loser,))
 
-        cur.execute("UPDATE matches SET winner_id=%s WHERE id=%s", (new_winner, match_id))
+        cur.execute("UPDATE matches SET winner_id=? WHERE id=?", (new_winner, match_id))
 
     conn.commit()
     cur.close()
@@ -417,7 +417,7 @@ def update_total_score():
     conn = get_db_connection()
     cur = get_cursor(conn)
 
-    cur.execute("SELECT * FROM matches WHERE id=%s", (match_id,))
+    cur.execute("SELECT * FROM matches WHERE id=?", (match_id,))
     match = cur.fetchone()
 
     if not match:
@@ -425,7 +425,7 @@ def update_total_score():
         conn.close()
         return jsonify({"success": False, "message": "Match not found!"})
 
-    cur.execute("SELECT * FROM ball_by_ball WHERE match_id=%s AND innings=%s ORDER BY over_number, ball_number", (match_id, innings))
+    cur.execute("SELECT * FROM ball_by_ball WHERE match_id=? AND innings=? ORDER BY over_number, ball_number", (match_id, innings))
     balls = cur.fetchall()
 
     if balls:
@@ -442,29 +442,29 @@ def update_total_score():
                     new_ball_run = min(new_ball_run, remaining)
                     new_ball_run = max(0, min(6, new_ball_run))
                 remaining -= new_ball_run
-                cur.execute("UPDATE ball_by_ball SET runs=%s WHERE id=%s", (new_ball_run, b["id"]))
+                cur.execute("UPDATE ball_by_ball SET runs=? WHERE id=?", (new_ball_run, b["id"]))
         else:
             remaining = new_runs
             for b in reversed(balls):
                 give = min(6, remaining)
-                cur.execute("UPDATE ball_by_ball SET runs=%s WHERE id=%s", (give, b["id"]))
+                cur.execute("UPDATE ball_by_ball SET runs=? WHERE id=?", (give, b["id"]))
                 remaining -= give
                 if remaining <= 0:
                     break
 
-        cur.execute("UPDATE ball_by_ball SET is_wicket=0 WHERE match_id=%s AND innings=%s", (match_id, innings))
+        cur.execute("UPDATE ball_by_ball SET is_wicket=0 WHERE match_id=? AND innings=?", (match_id, innings))
 
         if new_wickets > 0:
             for b in balls[:new_wickets]:
-                cur.execute("UPDATE ball_by_ball SET is_wicket=1 WHERE id=%s", (b["id"],))
+                cur.execute("UPDATE ball_by_ball SET is_wicket=1 WHERE id=?", (b["id"],))
 
     conn.commit()
 
     if innings == 1:
-        cur.execute("UPDATE matches SET team1_score=%s WHERE id=%s", (new_runs, match_id))
+        cur.execute("UPDATE matches SET team1_score=? WHERE id=?", (new_runs, match_id))
         new_score1, new_score2 = new_runs, match["team2_score"]
     else:
-        cur.execute("UPDATE matches SET team2_score=%s WHERE id=%s", (new_runs, match_id))
+        cur.execute("UPDATE matches SET team2_score=? WHERE id=?", (new_runs, match_id))
         new_score1, new_score2 = match["team1_score"], new_runs
 
     if new_score1 is not None and new_score2 is not None:
@@ -475,12 +475,12 @@ def update_total_score():
             old_loser = match["team2_id"] if old_winner == match["team1_id"] else match["team1_id"]
             new_loser = match["team2_id"] if new_winner == match["team1_id"] else match["team1_id"]
 
-            cur.execute("UPDATE teams SET wins=wins-1, points=points-2 WHERE id=%s", (old_winner,))
-            cur.execute("UPDATE teams SET losses=losses-1 WHERE id=%s", (old_loser,))
-            cur.execute("UPDATE teams SET wins=wins+1, points=points+2 WHERE id=%s", (new_winner,))
-            cur.execute("UPDATE teams SET losses=losses+1 WHERE id=%s", (new_loser,))
+            cur.execute("UPDATE teams SET wins=wins-1, points=points-2 WHERE id=?", (old_winner,))
+            cur.execute("UPDATE teams SET losses=losses-1 WHERE id=?", (old_loser,))
+            cur.execute("UPDATE teams SET wins=wins+1, points=points+2 WHERE id=?", (new_winner,))
+            cur.execute("UPDATE teams SET losses=losses+1 WHERE id=?", (new_loser,))
 
-        cur.execute("UPDATE matches SET winner_id=%s WHERE id=%s", (new_winner, match_id))
+        cur.execute("UPDATE matches SET winner_id=? WHERE id=?", (new_winner, match_id))
 
     conn.commit()
     cur.close()
@@ -502,7 +502,7 @@ def update_points():
     conn = get_db_connection()
     cur = get_cursor(conn)
 
-    cur.execute("SELECT * FROM teams WHERE id=%s", (team_id,))
+    cur.execute("SELECT * FROM teams WHERE id=?", (team_id,))
     team = cur.fetchone()
 
     if not team:
@@ -511,7 +511,7 @@ def update_points():
         return jsonify({"success": False, "message": "Team not found!"})
 
     cur.execute("""
-        UPDATE teams SET matches_played=%s, wins=%s, losses=%s, points=%s WHERE id=%s
+        UPDATE teams SET matches_played=?, wins=?, losses=?, points=? WHERE id=?
     """, (matches_played, wins, losses, points, team_id))
 
     conn.commit()
@@ -527,7 +527,7 @@ def simulate_single_match(match_id):
     conn = get_db_connection()
     cur = get_cursor(conn)
 
-    cur.execute("SELECT * FROM matches WHERE id=%s", (match_id,))
+    cur.execute("SELECT * FROM matches WHERE id=?", (match_id,))
     match = cur.fetchone()
 
     if not match:
@@ -540,19 +540,19 @@ def simulate_single_match(match_id):
 
     if was_played and match["stage"] == "league" and old_winner:
         old_loser = match["team2_id"] if old_winner == match["team1_id"] else match["team1_id"]
-        cur.execute("UPDATE teams SET matches_played=matches_played-1, wins=wins-1, points=points-2 WHERE id=%s", (old_winner,))
-        cur.execute("UPDATE teams SET matches_played=matches_played-1, losses=losses-1 WHERE id=%s", (old_loser,))
+        cur.execute("UPDATE teams SET matches_played=matches_played-1, wins=wins-1, points=points-2 WHERE id=?", (old_winner,))
+        cur.execute("UPDATE teams SET matches_played=matches_played-1, losses=losses-1 WHERE id=?", (old_loser,))
 
     score1, score2, winner_id = simulate_match(cur, match["team1_id"], match["team2_id"])
     loser_id = match["team2_id"] if winner_id == match["team1_id"] else match["team1_id"]
 
     cur.execute("""
-        UPDATE matches SET team1_score=%s, team2_score=%s, winner_id=%s, played=1 WHERE id=%s
+        UPDATE matches SET team1_score=?, team2_score=?, winner_id=?, played=1 WHERE id=?
     """, (score1, score2, winner_id, match_id))
 
     if match["stage"] == "league":
-        cur.execute("UPDATE teams SET matches_played=matches_played+1, wins=wins+1, points=points+2 WHERE id=%s", (winner_id,))
-        cur.execute("UPDATE teams SET matches_played=matches_played+1, losses=losses+1 WHERE id=%s", (loser_id,))
+        cur.execute("UPDATE teams SET matches_played=matches_played+1, wins=wins+1, points=points+2 WHERE id=?", (winner_id,))
+        cur.execute("UPDATE teams SET matches_played=matches_played+1, losses=losses+1 WHERE id=?", (loser_id,))
 
     conn.commit()
     generate_ball_by_ball(conn, cur, match_id, match["team1_id"], match["team2_id"], score1, score2)
@@ -561,17 +561,17 @@ def simulate_single_match(match_id):
         cur.execute("SELECT * FROM matches WHERE stage='final'")
         final = cur.fetchone()
 
-        cur.execute("SELECT * FROM matches WHERE stage='semifinal' AND id != %s AND played=1", (match_id,))
+        cur.execute("SELECT * FROM matches WHERE stage='semifinal' AND id != ? AND played=1", (match_id,))
         other_semi = cur.fetchone()
 
         if final and other_semi:
             cur.execute("""
-                UPDATE matches SET team1_id=%s, team2_id=%s, team1_score=NULL,
-                team2_score=NULL, winner_id=NULL, played=0 WHERE id=%s
+                UPDATE matches SET team1_id=?, team2_id=?, team1_score=NULL,
+                team2_score=NULL, winner_id=NULL, played=0 WHERE id=?
             """, (winner_id, other_semi["winner_id"], final["id"]))
-            cur.execute("DELETE FROM ball_by_ball WHERE match_id=%s", (final["id"],))
+            cur.execute("DELETE FROM ball_by_ball WHERE match_id=?", (final["id"],))
         elif not final and other_semi:
-            cur.execute("INSERT INTO matches (team1_id, team2_id, stage, played) VALUES (%s, %s, 'final', 0)",
+            cur.execute("INSERT INTO matches (team1_id, team2_id, stage, played) VALUES (?, ?, 'final', 0)",
                         (winner_id, other_semi["winner_id"]))
 
     conn.commit()

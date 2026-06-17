@@ -15,7 +15,7 @@ def live_auction_room():
     conn = get_db_connection()
     cur = get_cursor(conn)
 
-    cur.execute("SELECT * FROM auction_seats WHERE user_id = %s", (session["user_id"],))
+    cur.execute("SELECT * FROM auction_seats WHERE user_id = ?", (session["user_id"],))
     my_seat = cur.fetchone()
 
     cur.execute("SELECT COUNT(*) as c FROM auction_seats")
@@ -60,19 +60,19 @@ def claim_seat():
         conn.close()
         return jsonify({"success": False, "message": "All 8 seats are already taken!"})
 
-    cur.execute("SELECT * FROM auction_seats WHERE user_id = %s", (session["user_id"],))
+    cur.execute("SELECT * FROM auction_seats WHERE user_id = ?", (session["user_id"],))
     if cur.fetchone():
         cur.close()
         conn.close()
         return jsonify({"success": False, "message": "You already claimed a team!"})
 
-    cur.execute("SELECT * FROM auction_seats WHERE team_id = %s", (team_id,))
+    cur.execute("SELECT * FROM auction_seats WHERE team_id = ?", (team_id,))
     if cur.fetchone():
         cur.close()
         conn.close()
         return jsonify({"success": False, "message": "This team is already claimed!"})
 
-    cur.execute("INSERT INTO auction_seats (user_id, team_id, username) VALUES (%s, %s, %s)",
+    cur.execute("INSERT INTO auction_seats (user_id, team_id, username) VALUES (?, ?, ?)",
                 (session["user_id"], team_id, session["username"]))
     conn.commit()
     cur.close()
@@ -85,7 +85,7 @@ def claim_seat():
 def leave_seat():
     conn = get_db_connection()
     cur = get_cursor(conn)
-    cur.execute("DELETE FROM auction_seats WHERE user_id = %s", (session["user_id"],))
+    cur.execute("DELETE FROM auction_seats WHERE user_id = ?", (session["user_id"],))
     conn.commit()
     cur.close()
     conn.close()
@@ -122,8 +122,8 @@ def start_live_auction():
 
     timer_end = time.time() + BID_TIMER_SECONDS
     cur.execute("""
-        UPDATE auction_room SET current_player_id=%s, current_bid=%s,
-        current_bid_team_id=NULL, timer_end=%s, status='live' WHERE id=%s
+        UPDATE auction_room SET current_player_id=?, current_bid=?,
+        current_bid_team_id=NULL, timer_end=?, status='live' WHERE id=?
     """, (player["id"], player["base_price"], timer_end, room["id"]))
 
     conn.commit()
@@ -149,7 +149,7 @@ def live_state():
     }
 
     if room["current_player_id"]:
-        cur.execute("SELECT * FROM players WHERE id = %s", (room["current_player_id"],))
+        cur.execute("SELECT * FROM players WHERE id = ?", (room["current_player_id"],))
         player = cur.fetchone()
         if player:
             response["player"] = {
@@ -165,7 +165,7 @@ def live_state():
             }
 
     if room["current_bid_team_id"]:
-        cur.execute("SELECT * FROM teams WHERE id = %s", (room["current_bid_team_id"],))
+        cur.execute("SELECT * FROM teams WHERE id = ?", (room["current_bid_team_id"],))
         bidding_team = cur.fetchone()
         response["current_bid_team"] = bidding_team["name"]
         response["current_bid_team_id"] = bidding_team["id"]
@@ -197,7 +197,7 @@ def place_bid():
     conn = get_db_connection()
     cur = get_cursor(conn)
 
-    cur.execute("SELECT * FROM auction_seats WHERE user_id = %s", (session["user_id"],))
+    cur.execute("SELECT * FROM auction_seats WHERE user_id = ?", (session["user_id"],))
     seat = cur.fetchone()
 
     if not seat:
@@ -228,7 +228,7 @@ def place_bid():
         conn.close()
         return jsonify({"success": False, "message": "You are already the highest bidder!"})
 
-    cur.execute("SELECT * FROM teams WHERE id = %s", (seat["team_id"],))
+    cur.execute("SELECT * FROM teams WHERE id = ?", (seat["team_id"],))
     team = cur.fetchone()
 
     if bid_amount > team["budget"]:
@@ -238,7 +238,7 @@ def place_bid():
 
     new_timer_end = time.time() + BID_TIMER_SECONDS
     cur.execute("""
-        UPDATE auction_room SET current_bid=%s, current_bid_team_id=%s, timer_end=%s WHERE id=%s
+        UPDATE auction_room SET current_bid=?, current_bid_team_id=?, timer_end=? WHERE id=?
     """, (bid_amount, seat["team_id"], new_timer_end, room["id"]))
 
     conn.commit()
@@ -268,18 +268,18 @@ def check_timer():
         sold_price = room["current_bid"]
         team_id = room["current_bid_team_id"]
 
-        cur.execute("UPDATE players SET is_sold=1, sold_price=%s, team_id=%s WHERE id=%s",
+        cur.execute("UPDATE players SET is_sold=1, sold_price=?, team_id=? WHERE id=?",
                     (sold_price, team_id, player_id))
-        cur.execute("UPDATE teams SET budget=budget-%s WHERE id=%s", (sold_price, team_id))
+        cur.execute("UPDATE teams SET budget=budget-? WHERE id=?", (sold_price, team_id))
 
-        cur.execute("SELECT name FROM teams WHERE id=%s", (team_id,))
+        cur.execute("SELECT name FROM teams WHERE id=?", (team_id,))
         team = cur.fetchone()
-        cur.execute("SELECT name FROM players WHERE id=%s", (player_id,))
+        cur.execute("SELECT name FROM players WHERE id=?", (player_id,))
         player = cur.fetchone()
         result_message = f"{player['name']} SOLD to {team['name']} for ₹{sold_price} Cr!"
     else:
-        cur.execute("UPDATE players SET is_sold=1, sold_price=0, team_id=NULL WHERE id=%s", (player_id,))
-        cur.execute("SELECT name FROM players WHERE id=%s", (player_id,))
+        cur.execute("UPDATE players SET is_sold=1, sold_price=0, team_id=NULL WHERE id=?", (player_id,))
+        cur.execute("SELECT name FROM players WHERE id=?", (player_id,))
         player = cur.fetchone()
         result_message = f"{player['name']} went UNSOLD."
 
@@ -291,13 +291,13 @@ def check_timer():
     if next_player:
         new_timer_end = time.time() + BID_TIMER_SECONDS
         cur.execute("""
-            UPDATE auction_room SET current_player_id=%s, current_bid=%s,
-            current_bid_team_id=NULL, timer_end=%s, status='live' WHERE id=%s
+            UPDATE auction_room SET current_player_id=?, current_bid=?,
+            current_bid_team_id=NULL, timer_end=?, status='live' WHERE id=?
         """, (next_player["id"], next_player["base_price"], new_timer_end, room["id"]))
     else:
         cur.execute("""
             UPDATE auction_room SET status='finished', current_player_id=NULL,
-            current_bid=0, current_bid_team_id=NULL WHERE id=%s
+            current_bid=0, current_bid_team_id=NULL WHERE id=?
         """, (room["id"],))
         result_message += " 🎉 AUCTION COMPLETED!"
 
